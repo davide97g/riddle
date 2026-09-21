@@ -1,0 +1,25 @@
+# Secrets and machine-local state
+.env
+.riddle_session
+
+# Device backups. Contain the tablet's private keys, shell history and every
+# notebook. Never publish these.
+backup/rm2-*/
+backup/inventory-*/
+*.zip
+*.tar
+*.tar.gz
+
+# Captured pages: photographs of whatever was handwritten on the tablet.
+captures/
+
+# Build output and local tooling
+bin/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
