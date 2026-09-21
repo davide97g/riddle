@@ -151,12 +151,58 @@ export function PenStrokeRow({ event }: { event: DiaryEvent }) {
   )
 }
 
-export function ShotRow({ event }: { event: DiaryEvent }) {
-  const path = event.path
+/** Which way the disclosure points. Not a motif -- those three say what the
+ *  diary is doing, and this says what you may open. */
+function Chevron({ open }: { open: boolean }) {
   return (
-    <Row at={event.wall_ms} label="the screen">
-      {path && <Capture path={path} alt="the tablet's screen" className="max-h-80" />}
-    </Row>
+    <svg
+      viewBox="0 0 12 12"
+      aria-hidden
+      className={`h-3 w-3 transition-transform duration-150 ${open ? 'rotate-90' : ''}`}
+    >
+      <path
+        d="M4 2.5 8 6l-4 3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/** The whole page, photographed before the eraser ran, and folded away.
+ *
+ *  This row lands on every turn, whether or not the model went and looked,
+ *  and it is a picture of the entire page -- so left open it repeats your
+ *  own handwriting down the timeline and drowns the conversation it exists
+ *  to be context for. Collapsed it reads as one line among the tool rows,
+ *  which is what it is: something the diary was offered. Opening it shows
+ *  the photograph, and the photograph still opens full size from there. */
+export function ShotRow({ event }: { event: DiaryEvent }) {
+  const [open, setOpen] = useState(false)
+  const path = event.path
+  if (!path) return null
+  return (
+    <div className="row-in flex flex-col gap-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <span className="flex w-[30px] shrink-0 justify-center">
+          <Chevron open={open} />
+        </span>
+        <span className="min-w-0">
+          the whole page, photographed at {clock(event.wall_ms)}
+        </span>
+      </button>
+      {open && (
+        <Capture path={path} alt="the tablet's screen" className="max-h-80" />
+      )}
+    </div>
   )
 }
 
