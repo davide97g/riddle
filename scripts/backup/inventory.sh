@@ -4,9 +4,15 @@
 set -euo pipefail
 
 HOST="${RM2_SSH_HOST:-rm2}"
-HERE="$(cd "$(dirname "$0")" && pwd)"
+# Snapshots hold the tablet's private keys and every notebook on it, so
+# they are written under var/, which is gitignored whole and never
+# committed. riddle backup passes BACKUP_DIR; the default is for running
+# this script by hand.
+HERE="$(cd "$(dirname "$0")/../.." && pwd)"
+OUTDIR="${BACKUP_DIR:-$HERE/var/backups}"
+mkdir -p "$OUTDIR"
 TS="$(date +%Y%m%d-%H%M%S)"
-OUT="$HERE/inventory-$TS"
+OUT="$OUTDIR/inventory-$TS"
 mkdir -p "$OUT"
 
 echo "==> host: $HOST"
@@ -31,7 +37,8 @@ run 'cd /home/root/.local/share/remarkable/xochitl 2>/dev/null && \
      for f in *.metadata; do [ -e "$f" ] || continue; echo "===FILE=== $f"; cat "$f"; echo; done' \
   > "$OUT/metadata.raw"
 
-python3 - "$OUT" <<'PY'
+# The venv interpreter, not whatever python3 the system happens to have.
+"${RIDDLE_PYTHON:-$HERE/.venv/bin/python}" - "$OUT" <<'PY'
 import json, os, sys
 out = sys.argv[1]
 raw = open(os.path.join(out, "metadata.raw"), encoding="utf-8", errors="replace").read()

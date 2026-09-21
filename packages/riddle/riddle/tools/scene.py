@@ -1,14 +1,9 @@
-#!/usr/bin/env python3
 """Draw a picture and a diagram, to see how the pen handles each."""
 
 import math
-import sys
 import time
-from pathlib import Path
 
-
-from riddle.consent import consent
-
+from riddle import config, consent
 from riddle.ink import draw
 from riddle.device import Device
 from riddle.ink.diagram import Diagram, Node
@@ -59,8 +54,9 @@ def snake() -> list[draw.Polyline]:
     return [body_top, body_bottom, head, eye, *tongue, *scales]
 
 
-if __name__ == "__main__":
-    consent("draw the demo scene")
+def run(args) -> int:
+    consent.draw("draw the demo scene", yes=args.yes)
+    cfg = config.get()
     strokes = flowchart() + snake()
     strokes += layout_runs(
         [Run("nothing here is a font or a bitmap", SANS, 30)],
@@ -70,10 +66,12 @@ if __name__ == "__main__":
     )
     print(f"{len(strokes)} strokes, {sum(len(s) for s in strokes)} points")
 
-    device = Device()
+    device = Device(host=args.host or cfg.ssh_host)
     time.sleep(1.5)
+    device.select("pen")
     start = time.monotonic()
-    device.draw(strokes, pressure=3000, step_ms=1)
+    device.draw(strokes, pressure=cfg.pressure, step_ms=1)
     device.sync()
     print(f"drawn in {time.monotonic() - start:.1f}s")
     device.close()
+    return 0

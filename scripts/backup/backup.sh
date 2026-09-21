@@ -7,9 +7,15 @@
 set -euo pipefail
 
 HOST="${RM2_SSH_HOST:-rm2}"
-HERE="$(cd "$(dirname "$0")" && pwd)"
+# Snapshots hold the tablet's private keys and every notebook on it, so
+# they are written under var/, which is gitignored whole and never
+# committed. riddle backup passes BACKUP_DIR; the default is for running
+# this script by hand.
+HERE="$(cd "$(dirname "$0")/../.." && pwd)"
+OUTDIR="${BACKUP_DIR:-$HERE/var/backups}"
+mkdir -p "$OUTDIR"
 TS="${BACKUP_TS:-$(date +%Y%m%d-%H%M%S)}"
-OUT="$HERE/rm2-$TS"
+OUT="$OUTDIR/rm2-$TS"
 MODE="${BACKUP_MODE:-tar}"
 
 # Paths pulled from the device.

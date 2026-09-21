@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Find the tablet and say which way of reaching it is worth using.
 
 The diary does not care whether it is talking over the usb cable or over wifi:
@@ -15,7 +14,6 @@ This draws nothing, so it needs no --yes.
 import os
 import socket
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -61,7 +59,9 @@ def agent_latency(host: str) -> tuple[float, float] | str:
     up the IdentityFile that an ssh alias would have supplied -- and "no
     answer" sends you looking at the wrong thing entirely.
     """
-    agent = os.environ.get("RIDDLE_AGENT", "/home/root/riddle/riddled")
+    from riddle import config
+
+    agent = config.get().agent
     try:
         proc = subprocess.Popen(
             ["ssh", *SSH_OPTIONS, "-o", "BatchMode=yes", host, agent],
@@ -152,23 +152,38 @@ def probe(label: str, host: str) -> bool:
     return True
 
 
-def main() -> None:
-    # Aliases first: an entry in ~/.ssh/config carries the key and user, which
-    # a bare address does not, so a raw ip can fail here purely on auth.
+def routes(extra: list[str] | None = None) -> list[tuple[str, str]]:
+    """Every way there might be to reach the tablet, aliases first.
+
+    An entry in ~/.ssh/config carries the key and the user, which a bare
+    address does not, so a raw ip can fail here purely on authentication.
+    """
+    from riddle import config
+
+    cfg = config.get()
     targets = [
-        ("alias rm2", "rm2"),
-        ("alias rm2-wifi", "rm2-wifi"),
+        (f"alias {cfg.ssh_host}", cfg.ssh_host),
         ("usb cable", USB),
         ("mDNS", MDNS),
     ]
+    if cfg.wifi_host:
+        targets.append(("RM2_WIFI_HOST", cfg.wifi_host))
+    if cfg.ssh_host != "rm2":
+        targets.insert(1, ("alias rm2", "rm2"))
+    for arg in extra or []:
+        targets.append(("argument", arg))
+    # Keep the first spelling of each host: probing the same route twice
+    # tells you nothing and costs a connection timeout.
+    seen, unique = set(), []
+    for label, host in targets:
+        if host not in seen:
+            seen.add(host)
+            unique.append((label, host))
+    return unique
 
-    wifi = os.environ.get("RM2_WIFI_HOST")
-    if wifi:
-        targets.append(("RM2_WIFI_HOST", wifi))
-    for arg in sys.argv[1:]:
-        if not arg.startswith("--"):
-            targets.append(("argument", arg))
 
+def run(args) -> int:
+    targets = routes(args.hosts)
     print(f"probing {len(targets)} routes to the tablet\n")
     working = [host for label, host in targets if probe(label, host)]
 
@@ -178,13 +193,10 @@ def main() -> None:
             "nothing answered. check the tablet is awake, and that wifi is on\n"
             "and ssh is enabled under Settings > General > Storage"
         )
-        return
+        return 1
 
     print(f"usable: {', '.join(working)}")
     best = working[0]
     print(f"\nto use it:  export RM2_SSH_HOST={best}")
     print("or add it to ~/.ssh/config so the alias 'rm2' points there.")
-
-
-if __name__ == "__main__":
-    main()
+    return 0

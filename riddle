@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# The one command. Everything else is a subcommand of it.
+#
+# This exists so `./riddle diary start` works without activating a venv,
+# which is the shape the old launchers had and the only thing worth keeping
+# from them.
+set -euo pipefail
+cd "$(dirname "$0")"
+if [ ! -x .venv/bin/riddle ]; then
+    echo "no venv yet:" >&2
+    echo "  python3 -m venv .venv && .venv/bin/pip install -e packages/riddle" >&2
+    exit 1
+fi
+exec .venv/bin/riddle "$@"

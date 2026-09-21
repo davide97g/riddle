@@ -1,18 +1,15 @@
-#!/usr/bin/env python3
 """Wipe the visible page with the eraser."""
 
-import sys
 import time
-from pathlib import Path
 
-
-from riddle.ink import page
+from riddle import config, consent
 from riddle.device import Device
-from riddle.consent import consent
+from riddle.ink import page
 
-if __name__ == "__main__":
-    consent("erase the whole page")
-    device = Device()
+
+def run(args) -> int:
+    consent.draw("erase the whole page", yes=args.yes)
+    device = Device(host=args.host or config.get().ssh_host)
     time.sleep(1.5)
     passes = page.sweep()
     print(f"erasing in {len(passes)} passes")
@@ -20,3 +17,4 @@ if __name__ == "__main__":
     device.sync()
     device.close()
     print("page cleared")
+    return 0

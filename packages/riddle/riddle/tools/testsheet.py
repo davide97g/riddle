@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 
-from riddle.consent import consent
+from riddle import config, consent
 
 from riddle.ink import draw
 from riddle.device import Device
@@ -86,18 +86,19 @@ def sheet() -> list[draw.Polyline]:
     return out
 
 
-if __name__ == "__main__":
-    consent("draw the test sheet")
+def run(args) -> int:
+    consent.draw("draw the test sheet", yes=args.yes)
+    cfg = config.get()
     strokes = sheet()
     points = sum(len(s) for s in strokes)
     print(f"{len(strokes)} strokes, {points} raw points")
 
-    device = Device()
+    device = Device(host=args.host or cfg.ssh_host)
     time.sleep(1.5)
     device.select("pen")
     start = time.monotonic()
-    device.draw(strokes, pressure=3000, step_ms=6)
+    device.draw(strokes, pressure=cfg.pressure, step_ms=6)
     device.sync()
-    elapsed = time.monotonic() - start
-    print(f"drawn in {elapsed:.1f}s")
+    print(f"drawn in {time.monotonic() - start:.1f}s")
     device.close()
+    return 0
