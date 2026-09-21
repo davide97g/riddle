@@ -59,6 +59,34 @@ not, and cannot be -- the store cannot tell a dead loop from a live twin, so
 `Restart=always` will bounce off "another diary answered Ns ago" until the
 beat goes stale. Up to a minute, then it comes up by itself.
 
+## The microphone
+
+`parakeet-cli` is a whisper.cpp binary and whisper.cpp publishes none for
+Linux, so the box builds its own — the one thing here that needed `sudo`, for
+`build-essential` and `cmake`:
+
+```sh
+git clone --depth 1 --branch v1.9.1 https://github.com/ggml-org/whisper.cpp ~/src/whisper.cpp
+cmake -B build-static -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+      -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF
+cmake --build build-static -j6 --target parakeet-cli
+sudo install -m755 build-static/bin/parakeet-cli /usr/local/bin/
+```
+
+`v1.9.1` because that is the version the Mac has, and **`BUILD_SHARED_LIBS=OFF`
+is not a preference**: the default build links `libggml`, `libparakeet` and
+friends by an rpath into the build tree, so deleting that tree breaks the
+microphone and nothing says so until someone speaks. One 2.5 MB file with no
+`ggml` in its `ldd` output cannot rot that way.
+
+`/usr/local/bin` rather than `~/.local/bin` so a plain `ssh homelab` sees it —
+otherwise `riddle doctor` warns the microphone is missing while the units,
+which carry their own PATH, are using it perfectly well. `bun` is symlinked
+there for the same reason.
+
+CPU only, and it does not matter: 1.3s for a 1.74s clip including the model
+load, which happens every run. The reMarkable's pen is slower than that.
+
 ## The gate
 
 `RIDDLE_WEB_PASSWORD` in the box's `~/riddle/.env`. It is not decoration: the
@@ -98,6 +126,9 @@ plain http, and the browser's really is not.
   sits at. That is most of why it is not the Claude Code mind any more.
 - **`riddle voice share`.** That is tailscale's certificate, for when the page
   is on the Mac. Here the tunnel is the certificate.
+
+`riddle doctor` on the box therefore reads one failure — zig — and that is the
+expected state, not a thing to fix.
 
 ## Two loops, one digitizer
 
