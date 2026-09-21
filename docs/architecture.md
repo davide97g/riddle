@@ -93,4 +93,5 @@ the png from `riddle write` after changing font, weight or raster size.
 - [protocols.md](protocols.md) — both wires, in full
 - [device.md](device.md) — the tablet itself: firmware, ssh, calibration
 - [configuration.md](configuration.md) — every setting
+- [deploy.md](deploy.md) — where it actually runs, and what stays on the LAN
 - [privacy.md](privacy.md) — what is written down, and what leaves the machine

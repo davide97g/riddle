@@ -14,6 +14,10 @@ There is also a second half: a page you can open on your phone, speak into,
 and ask the diary for an answer from. It never touches the tablet — it leaves
 a note in a small shared database and the first half picks it up.
 
+Both halves run on a mini PC on the LAN rather than on a laptop, and the page
+is published on a Cloudflare tunnel — the tablet is not, and cannot be: ink
+only ever crosses the LAN. [docs/deploy.md](docs/deploy.md) is that setup.
+
 ## Two halves
 
 ```
