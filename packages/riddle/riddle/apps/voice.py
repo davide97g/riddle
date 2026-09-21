@@ -69,13 +69,35 @@ async def main() -> None:
     print(f"listening on http://{cfg.web_host}:{cfg.web_port} ({built})", file=sys.stderr)
     print("run `riddle voice share` to reach it from a phone", file=sys.stderr)
 
-    async with listening:
-        await asyncio.gather(
-            listening.serve_forever(), server.hub.tail(), heartbeat(memory)
-        )
+    try:
+        async with listening:
+            await asyncio.gather(
+                listening.serve_forever(), server.hub.tail(), heartbeat(memory)
+            )
+    finally:
+        # Says in the row that this half is gone. A beat outlives its process
+        # by a minute otherwise, and the page would spend that minute telling
+        # you the voice server is up.
+        memory.close()
+
+
+def _die_politely() -> None:
+    """Make a SIGTERM run the same shutdown a Ctrl-C does.
+
+    systemd stops a service by signalling it, and a signal with no handler
+    ends the process where it stands -- no `finally`, no closed store, a
+    heartbeat left behind looking alive.
+    """
+    import signal
+
+    def stop(signum, frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop)
 
 
 if __name__ == "__main__":
+    _die_politely()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

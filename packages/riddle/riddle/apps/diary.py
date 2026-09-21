@@ -751,6 +751,7 @@ class Session:
 def main() -> None:
     config.get()
     paths.ensure()
+    _die_politely()
     session = Session()
     try:
         session.run()
@@ -759,6 +760,22 @@ def main() -> None:
     finally:
         session.device.close()
         session.store.close()
+
+
+def _die_politely() -> None:
+    """Make a SIGTERM run the same shutdown a Ctrl-C does.
+
+    Without this the process simply stops: no `finally`, so the ssh pipe is
+    left to time out and -- worse -- the heartbeat stays in the row looking
+    alive. A supervisor that restarts the loop then meets its own corpse and
+    refuses to start for the rest of the stale window, once per restart.
+    """
+    import signal
+
+    def stop(signum, frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop)
 
 
 if __name__ == "__main__":

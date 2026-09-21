@@ -150,11 +150,15 @@ class Store:
     def gone(self, role: str) -> None:
         """Take a half's heartbeat out, because it was stopped on purpose.
 
-        A SIGTERM does not run the victim's cleanup, so its last beat sits in
-        the row looking alive for the whole stale window -- and a new loop
-        refuses to start while another loop looks alive. That made `riddle
-        start` fail for a minute after a stop. Whoever did the stopping knows
-        better than the clock does; this is it saying so.
+        A beat sits in the row looking alive for the whole stale window, and a
+        new loop refuses to start while another loop looks alive. That made
+        `riddle start` fail for a minute after a stop. Whoever did the
+        stopping knows better than the clock does; this is it saying so.
+
+        Both ends say it now. `close()` calls this for its own role, because
+        the half that is dying knows soonest -- and under systemd there is no
+        `riddle ... stop` in the picture at all, only a SIGTERM and, half a
+        second later, a replacement refusing to start.
         """
         column = "loop_ms" if role == "loop" else "voice_ms"
         self.conn.execute(
@@ -176,6 +180,8 @@ class Store:
         return int(time.time() * 1000) - self.started_ms
 
     def close(self) -> None:
+        if self.role in ("loop", "voice"):
+            self.gone(self.role)
         self.conn.execute(
             "UPDATE sessions SET ended_ms = ? WHERE id = ?",
             (int(time.time() * 1000), self.session_id),
