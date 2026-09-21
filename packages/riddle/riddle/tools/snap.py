@@ -7,7 +7,7 @@ from riddle.device import screen
 
 
 def run(args) -> int:
-    consent.screen("read the screen", yes=args.yes)
+    consent.screen("read the tablet's screen", yes=args.yes)
     out = args.out or paths.CAPTURES / f"screen-{int(time.time())}.png"
     out.parent.mkdir(parents=True, exist_ok=True)
 

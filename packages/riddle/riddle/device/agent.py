@@ -12,7 +12,6 @@ access point roams -- so the ssh options below fail fast and loudly rather than
 leaving a half-drawn stroke hanging on a dead socket.
 """
 
-import os
 import queue
 import subprocess
 import sys
@@ -64,7 +63,10 @@ class Device:
     def __init__(self, host: str | None = None, agent: str = REMOTE_AGENT) -> None:
         # Default to the env knob rather than the cable, so every tool follows
         # the same route as the diary itself once wifi is selected.
-        host = host or os.environ.get("RM2_SSH_HOST", "rm2")
+        if host is None:
+            from riddle import config
+
+            host = config.get().ssh_host
         self.events: queue.Queue = queue.Queue()
         self._pongs: queue.Queue = queue.Queue()
         self.host = host

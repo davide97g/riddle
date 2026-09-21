@@ -12,11 +12,11 @@ reconstructs the screen from the same query that fills it in the first place.
 
 import json
 import mimetypes
-import os
 import time
 import urllib.parse
 from pathlib import Path
 
+from riddle import config
 from riddle.web import wsock
 
 POLL_S = 0.25  # how often the store is tailed for anything new
@@ -92,7 +92,7 @@ class Server:
         path, _, raw_query = target.partition("?")
         query = dict(urllib.parse.parse_qsl(raw_query))
 
-        if os.environ.get("RIDDLE_WEB_DEBUG"):
+        if config.get().web_debug:
             print(f"{method} {path} ws={wsock.wanted(headers)}", flush=True)
         try:
             if path.startswith("/ws/") and wsock.wanted(headers):

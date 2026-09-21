@@ -7,11 +7,13 @@ here is `find`, `cat`, `du` or `tar -c`.
 ## What is here
 
 ```
-backup/
+scripts/backup/
   inventory.sh          survey the device, write a manifest (read-only, no copy)
-  backup.sh             copy the device into backup/rm2-<ts>/
+  backup.sh             copy the device into var/backups/rm2-<ts>/
   verify.sh             re-check a snapshot against its own SHA256SUMS
   restore.sh            push a snapshot back to the device (dry run by default)
+
+var/backups/            where snapshots land; gitignored, never committed
   inventory-<ts>/       output of inventory.sh
   rm2-<ts>/             a snapshot
 ```
@@ -86,9 +88,9 @@ alongside it if you want to keep notes.
 ### Re-running
 
 ```bash
-./backup/inventory.sh                                  # survey only, copies nothing
-./backup/backup.sh                                     # new snapshot
-./backup/verify.sh backup/rm2-<ts>          # re-check checksums
+riddle backup inventory                     # survey only, copies nothing
+riddle backup create                        # new snapshot
+riddle backup verify var/backups/rm2-<ts>   # re-check checksums
 ```
 
 `RM2_SSH_HOST` overrides the ssh alias. `BACKUP_MODE=rsync` switches transfer.
@@ -113,14 +115,14 @@ For a bootable-device disaster, reflash the stock image and then restore
 `restore.sh` is **dry run by default** and prints what it would change:
 
 ```bash
-./backup/restore.sh backup/rm2-<ts>                      # everything
-./backup/restore.sh backup/rm2-<ts> home/root/.local     # one subtree
+riddle backup restore var/backups/rm2-<ts>                   # everything
+riddle backup restore var/backups/rm2-<ts> home/root/.local  # one subtree
 ```
 
 To actually write, set `RESTORE_APPLY=1`; it then asks for a typed `yes`:
 
 ```bash
-RESTORE_APPLY=1 ./backup/restore.sh backup/rm2-<ts> home/root/.local
+riddle backup restore var/backups/rm2-<ts> home/root/.local --apply
 ```
 
 What it does, and the reasoning:
@@ -142,7 +144,7 @@ Cleanest path, because the store is flat and uuid-keyed. Find the uuid in
 
 ```bash
 ssh rm2 'systemctl stop xochitl'
-UUID=<uuid>; SNAP=backup/rm2-<ts>
+UUID=<uuid>; SNAP=var/backups/rm2-<ts>
 rsync -a --no-o --no-g \
   "$SNAP"/tree/home/root/.local/share/remarkable/xochitl/$UUID* \
   rm2:/home/root/.local/share/remarkable/xochitl/
@@ -158,7 +160,7 @@ it was, move the live one aside first — move, not delete, so it is recoverable
 ```bash
 ssh rm2 'systemctl stop xochitl && cd /home/root/.local/share/remarkable && \
          mv xochitl xochitl.old.$(date +%s) && mkdir xochitl'
-RESTORE_APPLY=1 ./backup/restore.sh backup/rm2-<ts> \
+riddle backup restore --apply var/backups/rm2-<ts> \
   home/root/.local/share/remarkable/xochitl
 ```
 
@@ -180,7 +182,7 @@ you do not want that, and watch what the cloud does before re-enabling.
 - **`tree/home/root/.ssh` and `tree/etc/dropbear` contain private keys**, and
   `.bash_history` is in there too. This snapshot is secrets-bearing — keep it
   off any shared drive and out of version control (`.gitignore` covers it).
-- **`.cache` is included** for completeness even though xochitl regenerates it. Add `'./root/.cache'` to `EXCLUDES` in `backup.sh` to skip it.
+- **`.cache` is included** for completeness even though xochitl regenerates it. Add `'./root/.cache'` to `EXCLUDES` in `scripts/backup/backup.sh` to skip it.
 - **Firmware-version coupling.** A snapshot's `/etc` matches the firmware it
   came from (recorded in `version.txt`). Pushing it onto a different firmware is
   asking for trouble; restore `/home/root` freely, restore `/etc` only onto the

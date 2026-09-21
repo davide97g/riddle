@@ -18,9 +18,7 @@ what lets it be called from a thread or a process that does not own the device.
 
 import gzip
 import io
-import os
 import subprocess
-import sys
 
 from PIL import Image
 
@@ -49,10 +47,6 @@ REMOTE = (
     "dd if=/proc/$PID/mem bs=4096 skip=$(( (0x$BASE + %d) / 4096 )) "
     "count=%d 2>/dev/null | gzip -1 -c"
 ) % (SKIP + BYTES, SKIP, PAGES)
-
-
-def allowed() -> bool:
-    return os.environ.get("RIDDLE_ALLOW_SNAP") == "1"
 
 
 def grab(host: str = "rm2", timeout: int = 30) -> Image.Image:
@@ -88,17 +82,3 @@ def png(host: str = "rm2", scale: float = 1.0, timeout: int = 30) -> bytes:
     buf = io.BytesIO()
     shot.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
-
-
-def consent() -> None:
-    """Refuse to read the tablet's memory unless someone has just said to.
-
-    This reads another process's address space over ssh. It is the right way
-    to see the page and it is still not something a diary with a model inside
-    it should do because it felt like it.
-    """
-    if allowed() or "--yes" in sys.argv:
-        return
-    sys.exit(
-        "refusing to read the screen: rerun with --yes, or set RIDDLE_ALLOW_SNAP=1"
-    )

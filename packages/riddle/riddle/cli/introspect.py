@@ -13,6 +13,9 @@ def add(sub) -> None:
     )
     conf.set_defaults(run=_config)
 
+    check = sub.add_parser("check", help="check the docs against the code")
+    check.set_defaults(run=_check_docs)
+
     doc = sub.add_parser("doctor", help="check everything this project needs to work")
     doc.add_argument("--quick", action="store_true", help="skip anything that touches the tablet")
     doc.add_argument("--json", action="store_true")
@@ -68,6 +71,12 @@ def _config(args) -> int:
         source = cfg.sources.get(setting.name, "default")
         print(f"  {setting.name:<{width}}  {values[setting.name]}  ({source})")
     return 0
+
+
+def _check_docs(args) -> int:
+    from riddle import check
+
+    return check.run(args)
 
 
 def _doctor(args) -> int:
