@@ -52,8 +52,7 @@ BUILD = VAR / "build"            # the cross-compiled agent
 BACKUPS = VAR / "backups"        # tablet snapshots: private keys, notebooks
 
 MEMORIES = VAR / "memories.txt"  # what survives a page turn
-SESSION = VAR / "session"        # the resumed Claude Code session id
-CHAT = VAR / "chat.json"        # the conversation, when the mind keeps no session
+CHAT = VAR / "chat.json"         # the conversation; the API keeps none for us
 
 # Tracked, not state: taps.json is calibration for this tablet's toolbar and
 # belongs in the repository.

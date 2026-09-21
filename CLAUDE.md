@@ -21,8 +21,9 @@ that will bite you.
 ```
 
 The venv holds `numpy` and `pillow` and an editable install of
-`packages/riddle`. Outside it: `zig`, `ssh`/`scp`, the `claude` CLI, and for
-the voice half `bun`, `tailscale` and `parakeet-cli`.
+`packages/riddle`. Outside it: `zig`, `ssh`/`scp`, and for the voice half
+`bun`, `tailscale` and `parakeet-cli`. The mind is an http call with an API
+key, so there is no CLI for it.
 
 There is no Python test suite. `bun run lint` (oxlint) covers the client.
 `./riddle doctor` is the closest thing to an integration check and should

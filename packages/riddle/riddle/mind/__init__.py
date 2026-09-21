@@ -1,41 +1,28 @@
 """The model, and the little the diary keeps when the conversation resets.
 
-Two backends answer, and `open()` is the only place that chooses between
-them. They share the words (`persona`) and the shape -- `reply_to(question)`
-and `forget()` -- and nothing above this package knows which one is running.
+One backend now. It used to be two -- DeepSeek for the words with a Claude
+Code subprocess reading the page for it, or Claude Code for both -- and the
+whole arrangement existed because the model that answered could not see. One
+that can collapses it into a single call, a single key, and no CLI to install
+and log in on a machine nobody sits at.
 
-- `deepseek`: fast and cheap, and the default. It cannot see, so `eyes` reads
-  the page for it, and it has no web search.
-- `llm`: Claude Code in print mode. It reads the capture itself and can search
-  the web, at a few seconds and a few cents a turn.
+`riddle.mind.openai` answers; `persona` holds the words, which outlived both
+of the models that said them before; `memory` is the handful of lines that
+survive a page turn.
 """
 
 from riddle import paths
 
 
 def open(cfg, memory=None):
-    """The mind `RIDDLE_MIND` asks for, built from the configuration."""
-    if cfg.mind == "claude":
-        from riddle.mind.llm import Diary
-
-        return Diary(
-            model=cfg.model,
-            max_words=cfg.max_words,
-            session_file=paths.SESSION,
-            memory=memory,
-        )
-    if cfg.mind != "deepseek":
-        raise SystemExit(
-            f"RIDDLE_MIND={cfg.mind!r}: it is 'deepseek' or 'claude'"
-        )
-    from riddle.mind.deepseek import Diary
+    """The diary's mind, built from the configuration."""
+    from riddle.mind.openai import Diary
 
     return Diary(
-        key=cfg.deepseek_key,
-        model=cfg.deepseek_model,
-        url=cfg.deepseek_url,
+        key=cfg.openai_key,
+        model=cfg.openai_model,
+        url=cfg.openai_url,
         max_words=cfg.max_words,
-        eyes_model=cfg.eyes_model,
         chat_file=paths.CHAT,
         memory=memory,
     )

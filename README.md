@@ -114,11 +114,10 @@ Take a backup first: `./riddle backup create`.
 ## It records things
 
 Photographs of your handwriting, recordings of the room, transcripts, and
-what each turn cost — all under `var/`, which is gitignored whole. Two
-companies see a turn by default: the photograph of the page goes to Anthropic,
-whose model reads out what is on it, and that reading plus the transcript
-window goes to DeepSeek, which writes the reply. `RIDDLE_MIND=claude` sends
-both to Anthropic instead, and lets the model search the web.
+what each turn cost — all under `var/`, which is gitignored whole. One company
+sees a turn: the photograph of the page and the transcript window go to
+OpenAI, attached to the same call that writes the reply. There is no second
+model, and the diary has no tools — it searches nothing.
 
 Anything said near the microphone inside a turn's window becomes part of the
 question, including other people in the room.

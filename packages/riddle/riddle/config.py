@@ -69,27 +69,17 @@ SETTINGS: tuple[Setting, ...] = (
             "page is actually on screen; this is a statement of intent."),
     Setting("RIDDLE_PAUSE_MS", "pause_ms", int, 3000, "diary",
             "Idle time after a pen lift before the diary answers."),
-    Setting("RIDDLE_MIND", "mind", str, "deepseek", "diary",
-            "Who writes the reply: `deepseek` calls the DeepSeek API "
-            "directly, `claude` shells out to the claude CLI. DeepSeek is "
-            "faster and far cheaper; it cannot see, so the page is read for "
-            "it first."),
-    Setting("RIDDLE_MODEL", "model", str, "claude-sonnet-5", "diary",
-            "Which model answers when RIDDLE_MIND is `claude`."),
-    Setting("RIDDLE_DEEPSEEK_MODEL", "deepseek_model", str, "deepseek-chat", "diary",
-            "Which DeepSeek model answers. `deepseek-chat` is the fast one; "
-            "`deepseek-reasoner` thinks first and a diary has no time for it."),
-    Setting("RIDDLE_DEEPSEEK_KEY", "deepseek_key", str, "", "diary",
-            "The DeepSeek API key. Put it in .env, which is gitignored and "
+    Setting("RIDDLE_OPENAI_MODEL", "openai_model", str, "gpt-4.1-mini", "diary",
+            "Which model answers. It has to be able to see -- the page is "
+            "attached to the turn -- and it has to be quick, because the "
+            "reply is two dozen words and the pause is already over."),
+    Setting("RIDDLE_OPENAI_KEY", "openai_key", str, "", "diary",
+            "The OpenAI API key. Put it in .env, which is gitignored and "
             "must be chmod 600.", secret=True),
-    Setting("RIDDLE_DEEPSEEK_URL", "deepseek_url", str, "https://api.deepseek.com",
+    Setting("RIDDLE_OPENAI_URL", "openai_url", str, "https://api.openai.com/v1",
             "diary",
-            "Where that API lives. Anything OpenAI-compatible works, which "
-            "is how a local model would be dropped in."),
-    Setting("RIDDLE_EYES_MODEL", "eyes_model", str, "claude-haiku-4-5-20251001", "diary",
-            "The model that reads the page: what was written, and what was "
-            "drawn around it. It runs through the claude CLI and only ever "
-            "describes; the diary itself answers."),
+            "Where that API lives. Anything OpenAI-compatible that takes an "
+            "image works, which is how a local model would be dropped in."),
     Setting("RIDDLE_MAX_WORDS", "max_words", int, 22, "diary",
             "How long a reply may be. A page is small and the pen is slow."),
 
@@ -179,12 +169,9 @@ class Config:
     agent: str
     notebook: str
     pause_ms: int
-    mind: str
-    model: str
-    deepseek_model: str
-    deepseek_key: str
-    deepseek_url: str
-    eyes_model: str
+    openai_model: str
+    openai_key: str
+    openai_url: str
     max_words: int
     font_body: str
     font_accent: str

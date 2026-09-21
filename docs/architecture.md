@@ -53,7 +53,7 @@ Everything Python is one installable package, `packages/riddle/riddle`.
 |---|---|
 | `riddle.device` | the ssh transport. `agent` (the pipe to `riddled`, and the only thing that injects), `ssh` (options and remote paths), `taps` (recorded toolbar presses), `screen` (the framebuffer out of xochitl's memory), `notebook`, `pages` (noticing a page turn) |
 | `riddle.ink` | marks on a page. `geometry` (the only module that knows the digitizer is rotated), `hershey` and `skeleton` (the two ways to turn text into pen paths, interchangeable above `style`), `style`, `render`, `draw`, `diagram`, `page`, `image`, `lineart` |
-| `riddle.mind` | who answers. `persona` (the words, shared), `deepseek` (the default: one http call, fast and cheap, blind), `eyes` (a vision model reading the page for it), `llm` (the claude subprocess, which can see and search), `memory` (the lines that survive a reset) |
+| `riddle.mind` | who answers. `openai` (one http call per turn, with the page attached to it), `persona` (the words, which outlived the two models that said them before), `memory` (the lines that survive a reset) |
 | `riddle.store` | `db` and `schema.sql` |
 | `riddle.voice` | `ears`: the energy gate and the speech model |
 | `riddle.web` | `server` (http and websockets) and `wsock` (enough RFC 6455 for one browser) |

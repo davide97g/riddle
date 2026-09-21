@@ -87,8 +87,9 @@ plain http, and the browser's really is not.
 
 - **`riddle device build`.** Cross-compiling the agent wants zig; the agent is
   already on the tablet and is built from the Mac.
-- **The Claude Code mind.** `RIDDLE_MIND=deepseek` is one http call and an API
-  key, so there is no `claude` CLI to install and log in.
+- **Any CLI for the model.** The mind is one http call with the page attached,
+  so there is nothing to install and nothing to log in to on a machine nobody
+  sits at. That is most of why it is not the Claude Code mind any more.
 - **`riddle voice share`.** That is tailscale's certificate, for when the page
   is on the Mac. Here the tunnel is the certificate.
 

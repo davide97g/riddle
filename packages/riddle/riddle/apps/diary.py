@@ -283,8 +283,7 @@ class Session:
                 "doing": "opened",
                 "host": cfg.ssh_host,
                 "notebook": cfg.notebook,
-                "mind": cfg.mind,
-                "model": cfg.deepseek_model if cfg.mind == "deepseek" else cfg.model,
+                "model": cfg.openai_model,
             },
         )
 

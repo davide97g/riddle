@@ -45,7 +45,6 @@ def check_tools() -> list[Result]:
     wanted = [
         ("zig", ["version"], "brew install zig", True),
         ("bun", ["--version"], "brew install oven-sh/bun/bun", True),
-        ("claude", ["--version"], "install the claude CLI", True),
         ("parakeet-cli", ["--help"], "install parakeet-cli for the microphone", False),
         ("tailscale", ["version"], "install tailscale to reach the page from a phone", False),
         ("ssh", ["-V"], "install openssh", True),
@@ -113,19 +112,12 @@ def _mind(cfg) -> list[Result]:
     the pen works, and every turn ends with an error event nobody is watching
     for. So it is said here, before a page is written on.
     """
-    if cfg.mind == "claude":
-        return [Result(OK, "config", "mind", f"claude, {cfg.model}")]
-    if cfg.mind != "deepseek":
-        return [Result(FAIL, "config", "mind", f"{cfg.mind!r} is not a mind",
-                       "RIDDLE_MIND is 'deepseek' or 'claude'")]
-    out = [Result(OK, "config", "mind", f"deepseek, {cfg.deepseek_model}")]
-    if cfg.deepseek_key:
-        out.append(Result(OK, "config", "deepseek key", f"set, {len(cfg.deepseek_key)} chars"))
+    out = [Result(OK, "config", "mind", f"openai, {cfg.openai_model}")]
+    if cfg.openai_key:
+        out.append(Result(OK, "config", "openai key", f"set, {len(cfg.openai_key)} chars"))
     else:
-        out.append(Result(FAIL, "config", "deepseek key", "not set",
-                          "put RIDDLE_DEEPSEEK_KEY in .env"))
-    # The page is read by a model that can see, whichever mind answers.
-    out.append(Result(OK, "config", "eyes", cfg.eyes_model))
+        out.append(Result(FAIL, "config", "openai key", "not set",
+                          "put RIDDLE_OPENAI_KEY in .env"))
     return out
 
 

@@ -16,8 +16,7 @@ entirely without breaking anything that matters.
 | `var/audio/utt-*.wav` | recordings of your room, one per utterance | `RIDDLE_AUDIO_KEEP_DAYS`, 7 by default |
 | `var/riddle.db` | every transcript, every stroke, every reply, what each turn cost | until you delete it |
 | `var/memories.txt` | the handful of lines the diary chose to keep | until you delete it |
-| `var/session` | a Claude Code session id, so the conversation also lives in `~/.claude` | until the page turns |
-| `var/chat.json` | the conversation itself, when the mind is DeepSeek: it keeps nothing, so this is where the thread lives | until the page turns |
+| `var/chat.json` | the conversation itself: the API keeps none of it, so this is where the thread lives | until the page turns |
 | `var/backups/rm2-*` | a whole tablet: every notebook, its shell history, **its private ssh keys** | until you delete it |
 | `.env` | the tablet's root password | — |
 
@@ -37,20 +36,17 @@ that a deleted row pointed at, and `var/memories.txt` survives it.
 
 ## What leaves the machine
 
-Two companies, by default, and it is worth knowing which sees what.
+One company, and it is worth knowing what it sees.
 
-- **The rendered page goes to Anthropic**, through the `claude` CLI, on every
-  turn that has ink on it. `RIDDLE_EYES_MODEL` reads it and describes what is
-  written and drawn there; that call sees the photograph itself.
-- **That description, and the transcript window, go to DeepSeek**, which
-  writes the reply. It never sees the image, and the conversation it is sent
-  is the one in `var/chat.json`, so earlier pages' descriptions go with it.
-  DeepSeek is a Chinese company and its API terms are its own; if that is not
-  a thing you want, `RIDDLE_MIND=claude` is one line in `.env`.
-- **With `RIDDLE_MIND=claude`, only Anthropic sees any of it**, and the model
-  may then search the web: `WebSearch` and `WebFetch` are allowed tools, in
-  character, so a question written on the page can become a query sent to a
-  search engine. The DeepSeek mind has no tools and searches nothing.
+- **The photograph of your page goes to OpenAI** on every turn that has ink
+  on it, attached to the turn itself. Not a description of it: the image,
+  your handwriting as you wrote it.
+- **The transcript window goes with it**, along with the conversation in
+  `var/chat.json` -- the words of earlier turns in this thread, though not
+  their images, which are never carried forward.
+- **That is the whole list.** There is no second model and no tools: the
+  diary searches nothing, fetches nothing, and cannot see anything on this
+  machine that a turn did not hand it.
 - Nothing else. The server binds loopback; `riddle voice share` exposes it
   only on your own tailnet, behind a certificate.
 
