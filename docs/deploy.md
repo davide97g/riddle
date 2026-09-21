@@ -53,6 +53,12 @@ ssh homelab 'systemctl --user restart riddle-voice riddle-diary'
 There is no CI for this one. `riddle doctor --quick` on the box is the check
 that it is still whole.
 
+A restart is clean because both halves handle SIGTERM: they run the same
+shutdown a Ctrl-C would and clear their heartbeat on the way out. A *crash* is
+not, and cannot be -- the store cannot tell a dead loop from a live twin, so
+`Restart=always` will bounce off "another diary answered Ns ago" until the
+beat goes stale. Up to a minute, then it comes up by itself.
+
 ## The gate
 
 `RIDDLE_WEB_PASSWORD` in the box's `~/riddle/.env`. It is not decoration: the
