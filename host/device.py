@@ -3,8 +3,16 @@
 The agent runs on the reMarkable over ssh; pen samples arrive on its stdout
 and drawing commands go back down its stdin. Keeping the transport on the ssh
 pipe means nothing has to listen on a port on the device.
+
+The link works over wifi as well as the usb cable, and that is not luck: every
+delay in a stroke is a SLEEP the *agent* performs, so the host only has to get
+the commands there in time. Latency shifts a stroke, it does not distort it.
+What wifi does change is that the link can now drop -- the tablet sleeps, the
+access point roams -- so the ssh options below fail fast and loudly rather than
+leaving a half-drawn stroke hanging on a dead socket.
 """
 
+import os
 import queue
 import subprocess
 import sys
@@ -15,6 +23,17 @@ import taps as tap_store
 from geometry import PRESSURE_MAX, screen_to_wacom, wacom_to_screen
 
 REMOTE_AGENT = "/home/root/riddle/riddled"
+
+# Notice a dead link in about 15s instead of hanging on TCP's own timeout, and
+# keep the connection from being idled out by an access point between replies.
+SSH_OPTIONS = [
+    "-o", "ServerAliveInterval=5",
+    "-o", "ServerAliveCountMax=3",
+    "-o", "ConnectTimeout=10",
+    "-o", "TCPKeepAlive=yes",
+    # Interactive traffic: tiny writes, sent now rather than coalesced.
+    "-o", "IPQoS=lowdelay throughput",
+]
 
 
 @dataclass
@@ -41,11 +60,15 @@ class PenUp:
 
 
 class Device:
-    def __init__(self, host: str = "rm2", agent: str = REMOTE_AGENT) -> None:
+    def __init__(self, host: str | None = None, agent: str = REMOTE_AGENT) -> None:
+        # Default to the env knob rather than the cable, so every tool follows
+        # the same route as the diary itself once wifi is selected.
+        host = host or os.environ.get("RM2_SSH_HOST", "rm2")
         self.events: queue.Queue = queue.Queue()
         self._pongs: queue.Queue = queue.Queue()
+        self.host = host
         self.proc = subprocess.Popen(
-            ["ssh", host, agent],
+            ["ssh", *SSH_OPTIONS, host, agent],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -147,6 +170,10 @@ class Device:
         self.replay(recorded)
         self._send("SLEEP 400")
         return True
+
+    def alive(self) -> bool:
+        """Whether the agent is still on the other end of the pipe."""
+        return self.proc.poll() is None
 
     def sync(self, timeout: float = 600.0) -> None:
         """Block until the tablet has worked through everything queued.
