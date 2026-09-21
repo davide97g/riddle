@@ -8,17 +8,37 @@ heavier ink.
 
 import re
 
-from hershey import Font, Run
+import hershey
+import skeleton
+from hershey import Run
 
 EMPHASIS = re.compile(r"\*([^*]+)\*")
 
 LONG_ANSWER_WORDS = 10
 
+# Dancing Script is a joined hand and needs weight to survive thinning: at its
+# lightest the skeleton comes out broken. This is the axis value, not a scale.
+SKELETON_WEIGHT = 600
+
+
+def load(name: str):
+    """Open a font by name, whichever kind it turns out to be.
+
+    A name matching a .ttf is skeletonised into pen paths; anything else is
+    looked up in the Hershey set. Both answer the same calls, so the rest of
+    the pipeline never has to ask which it is holding.
+    """
+    if (skeleton.FONT_DIR / f"{name}.ttf").exists():
+        return skeleton.Font(name, weight=SKELETON_WEIGHT)
+    return hershey.Font(name)
+
 
 class Palette:
-    def __init__(self, body: str = "futural", accent: str = "scripts") -> None:
-        self.body = Font(body)
-        self.accent = Font(accent)
+    def __init__(
+        self, body: str = "futural", accent: str = "DancingScript"
+    ) -> None:
+        self.body = load(body)
+        self.accent = load(accent)
 
     def runs(self, reply: str, height: float) -> list[Run]:
         plain = EMPHASIS.sub(r"\1", reply)

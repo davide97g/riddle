@@ -94,6 +94,26 @@ class _Word:
         return self.run.font.width(self.text, self.run.scale)
 
 
+def _word_strokes(word: _Word, pen_x: float, baseline: float) -> list[Polyline]:
+    """Ink for one word, asking the font for the whole word when it can.
+
+    A joined hand has to be drawn a word at a time: in cursive the exit of one
+    letter is the entry of the next, so setting glyphs side by side from their
+    advance widths leaves a gap at every join. The Hershey fonts are unjoined
+    and have no such method, so they are still stepped letter by letter.
+    """
+    run = word.run
+    whole = getattr(run.font, "word", None)
+    if whole is not None:
+        return whole(word.text, pen_x, baseline, run.scale)
+
+    strokes: list[Polyline] = []
+    for ch in word.text:
+        strokes.extend(run.font.glyph(ch, pen_x, baseline, run.scale))
+        pen_x += run.font.advance(ch, run.scale)
+    return strokes
+
+
 def _embolden(strokes: list[Polyline], offset: float) -> list[Polyline]:
     """Fake a heavier nib by tracing each path again, just beside itself."""
     doubled = list(strokes)
@@ -143,10 +163,11 @@ def layout_runs(
         for index, word in enumerate(line):
             if index:
                 pen_x += space(word.run)
-            for ch in word.text:
-                glyph = word.run.font.glyph(ch, pen_x, pen_y, word.run.scale)
-                strokes.extend(_embolden(glyph, bold_offset) if word.run.bold else glyph)
-                pen_x += word.run.font.advance(ch, word.run.scale)
+            glyphs = _word_strokes(word, pen_x, pen_y)
+            strokes.extend(
+                _embolden(glyphs, bold_offset) if word.run.bold else glyphs
+            )
+            pen_x += word.width
         pen_y += line_height * line_gap
     return strokes
 
