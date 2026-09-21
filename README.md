@@ -44,6 +44,15 @@ A few decisions that look odd until you know why:
 - **C, not Python, on the device.** Firmware 3.28 ships no Python at all; 3.15
   shipped one built without ctypes, socket, fcntl or mmap. Either way it cannot
   touch an input device.
+- **Skeletons, not outlines.** A pen cannot fill, so an ordinary font would be
+  traced as hollow, double-walled letters. Rasterising a word and thinning it to
+  a one-pixel ridge turns any font into the line a nib would have taken — which
+  is how the diary writes in a joined hand instead of Hershey's wire letters.
+- **Wifi works as well as the cable**, because every pause inside a stroke is
+  performed by the agent on the tablet. Latency moves a stroke in time; it does
+  not bend it. Measured round trip: 1 ms on usb, 5 ms on wifi. Enabling wifi ssh
+  means creating `~/.config/remarkable/rm_enable_ssh_wifi_marker` on the tablet;
+  do it key-only unless you are happy with root over the network on a password.
 - **evdev, not the framebuffer.** `rm2fb` does not work: xochitl is Qt6
   (6.10.3 on firmware 3.28) and the prebuilt shim is still Qt5.
 - **The pause is measured from a pen lift, not from silence.** A nib resting on
@@ -74,7 +83,7 @@ a Python with Pillow.
    until you check the new fingerprint on that same screen and then run
    `ssh-keygen -R 10.11.99.1`.
 3. `cp .env.example .env` and fill it in.
-4. `python3 -m venv .venv && ./.venv/bin/pip install pillow`
+4. `python3 -m venv .venv && ./.venv/bin/pip install pillow numpy`
 5. `./device/build.sh` — cross-compiles the agent and drops it on the tablet.
 6. `./run.sh` — open a notebook on the tablet, write something, and stop.
 
