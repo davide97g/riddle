@@ -90,6 +90,33 @@ def alive(service: Service) -> int | None:
     return pid
 
 
+def elsewhere(service: Service) -> int | None:
+    """A process running this service that no pidfile here claims.
+
+    systemd is the usual answer. On the box the two halves are user units,
+    and a unit keeps no pidfile in `var/run`, so everything that reads one --
+    `status`, `doctor`, the orphan-ssh check -- would otherwise report a
+    machine as idle while it is plainly answering.
+
+    It is deliberately only *reported*, never acted on: `stop` still refuses
+    to signal anything it did not start, because the supervisor that did is
+    the thing that should be asked.
+    """
+    if alive(service) is not None:
+        return None
+    try:
+        done = subprocess.run(
+            ["pgrep", "-f", f"-m {service.module}"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for token in done.stdout.split():
+        if token.isdigit() and int(token) != os.getpid():
+            return int(token)
+    return None
+
+
 def clear_stale(service: Service) -> bool:
     """Remove a pidfile that no longer names this service."""
     if service.pidfile.exists() and alive(service) is None:
@@ -212,6 +239,11 @@ def stop(service: Service, *, timeout: float = 6.0) -> int:
 def status(service: Service, *, lines: int = 3) -> int:
     pid = alive(service)
     if pid is None:
+        other = elsewhere(service)
+        if other is not None:
+            print(f"{service.verb} (pid {other}), started by something else")
+            print("systemctl --user status riddle-" + service.name)
+            return 0
         if clear_stale(service):
             print("not running (cleared a stale pidfile)")
         else:

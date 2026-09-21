@@ -239,14 +239,19 @@ def check_services() -> list[Result]:
     out = []
     for service in (process.DIARY, process.VOICE):
         pid = process.alive(service)
+        other = None if pid else process.elsewhere(service)
         if pid:
             out.append(Result(OK, "services", service.name, f"{service.verb} (pid {pid})"))
+        elif other:
+            out.append(Result(OK, "services", service.name,
+                              f"{service.verb} (pid {other}), under another supervisor"))
         elif service.pidfile.exists():
             out.append(Result(WARN, "services", service.name, "stale pidfile",
                               f"riddle {service.name} status clears it"))
         else:
             out.append(Result(OK, "services", service.name, "not running"))
-    if tailnet.port_open(cfg.web_host, cfg.web_port) and not process.alive(process.VOICE):
+    voice_up = process.alive(process.VOICE) or process.elsewhere(process.VOICE)
+    if tailnet.port_open(cfg.web_host, cfg.web_port) and not voice_up:
         out.append(
             Result(WARN, "services", "port",
                    f"something else is on {cfg.web_host}:{cfg.web_port}")
@@ -271,7 +276,7 @@ def _orphan_agents() -> int:
     pids = [p for p in done.stdout.split() if p.isdigit()]
     if not pids:
         return 0
-    if process.alive(process.DIARY):
+    if process.alive(process.DIARY) or process.elsewhere(process.DIARY):
         return 0
     return len(pids)
 
