@@ -119,6 +119,10 @@ SETTINGS: tuple[Setting, ...] = (
             "the api still works.", base="root"),
     Setting("RIDDLE_WEB_DEBUG", "web_debug", bool, False, "voice",
             "Log every request line."),
+    Setting("RIDDLE_WEB_PASSWORD", "web_password", str, "", "voice",
+            "One password in front of the page. Empty means no gate, which is "
+            "right on loopback and wrong the moment the port is published.",
+            secret=True),
     Setting("RIDDLE_ASR_MODEL", "asr_model", Path,
             "ggml-parakeet-tdt-0.6b-v3-q8_0.bin", "voice",
             "The speech model, fetched once by hand. Relative paths hang off "
@@ -191,6 +195,7 @@ class Config:
     web_port: int
     web_dir: Path
     web_debug: bool
+    web_password: str
     asr_model: Path
     asr_threads: int
     vad_floor: float

@@ -17,7 +17,7 @@ import urllib.parse
 from pathlib import Path
 
 from riddle import config
-from riddle.web import wsock
+from riddle.web import auth, wsock
 
 POLL_S = 0.25  # how often the store is tailed for anything new
 
@@ -76,6 +76,9 @@ class Server:
         self.web_dir = web_dir
         self.hub = Hub(store)
         self.ears = ears
+        # Off unless a password is set, which is the loopback case: reaching
+        # the port already means reaching the machine.
+        self.gate = auth.Gate(config.get().web_password)
 
     # --- http ------------------------------------------------------------
 
@@ -94,16 +97,55 @@ class Server:
 
         if config.get().web_debug:
             print(f"{method} {path} ws={wsock.wanted(headers)}", flush=True)
+        handed_over = False
         try:
+            # `/api/health` stays open: it is what a probe asks, it says
+            # nothing the login page does not, and a monitor that has to hold
+            # a password is a monitor that stops working when it changes.
+            if path != "/api/health" and not self.gate.allows(headers):
+                self.refuse(writer, method, path, headers, body)
+                return
             if path.startswith("/ws/") and wsock.wanted(headers):
+                handed_over = True
                 await self.socket(reader, writer, headers, path, query)
                 return
             await self.route(writer, method, path, query, body)
         except (ConnectionResetError, BrokenPipeError):
             pass
         finally:
-            if not path.startswith("/ws/"):
+            if not handed_over:
                 writer.close()
+
+    def refuse(self, writer, method, path, headers, body) -> None:
+        """What an unauthenticated request gets, by what asked.
+
+        The socket is refused here rather than upgraded and closed, because a
+        page that gets a live socket believes it is in. A browser asking for
+        a page gets the form; anything scripted gets json it can read.
+        """
+        if method == "POST" and path == "/api/login":
+            return self.login(writer, headers, body)
+        if path.startswith("/api/") or path.startswith("/ws/"):
+            return _json(writer, {"error": "locked"}, status="401 Unauthorized")
+        return _send(writer, auth.page(), "text/html; charset=utf-8",
+                     status="401 Unauthorized")
+
+    def login(self, writer, headers, body) -> None:
+        """One field, one cookie, and a redirect rather than a page.
+
+        The redirect matters: it turns the POST into a GET, so a reload does
+        not re-submit the password and the browser offers to remember it.
+        """
+        form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+        if not self.gate.admits(form.get("password", "")):
+            return _send(writer, auth.page(wrong=True), "text/html; charset=utf-8",
+                         status="401 Unauthorized")
+        # Behind cloudflared the connection to this process is plain http and
+        # the browser's is not, so the proxy's word is the only evidence that
+        # a Secure cookie will ever come back.
+        secure = headers.get("x-forwarded-proto", "").lower() == "https"
+        return _send(writer, b"", "text/plain", status="303 See Other",
+                     extra={"Location": "/", "Set-Cookie": self.gate.crumb(secure)})
 
     async def route(self, writer, method, path, query, body) -> None:
         if path == "/api/health":

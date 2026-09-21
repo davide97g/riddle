@@ -54,6 +54,15 @@ and why the bind address should stay `127.0.0.1`. `share` refuses when
 nothing is listening on the port, because a certificate in front of a dead
 port shows the phone a 502 and sends you to debug the wrong layer.
 
+## The password
+
+`RIDDLE_WEB_PASSWORD` puts one password in front of the whole page. Unset, as
+it is by default, there is no gate at all -- right for `127.0.0.1`, where
+reaching the port already means reaching the machine, and wrong the moment
+the port is published to anything. The mechanics are in
+[protocols.md](protocols.md#the-gate); what matters here is that the page can
+make the pen write, so whoever reaches it is writing in your notebook.
+
 For development: `riddle web dev --tailnet`, or `riddle dev --tailnet` for
 that dev server and both halves at once. Hot reload has to dial 443 over
 `wss` because tailscale terminates the TLS, and `RIDDLE_SERVER` points the

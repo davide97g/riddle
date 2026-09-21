@@ -55,6 +55,7 @@ nothing reads, a value of the wrong type, and a stale example file.
 | `RIDDLE_WEB_PORT` | `8765` | the voice server | The port the page is served on. |
 | `RIDDLE_WEB_DIR` | `apps/web/dist` | the voice server | The built client. Without it the server serves a stub page and the api still works. |
 | `RIDDLE_WEB_DEBUG` | `1 to enable` | the voice server | Log every request line. |
+| `RIDDLE_WEB_PASSWORD` | _(unset)_ | the voice server | One password in front of the page. Empty means no gate, which is right on loopback and wrong the moment the port is published. |
 | `RIDDLE_ASR_MODEL` | `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | the voice server | The speech model, fetched once by hand. Relative paths hang off var/models. |
 | `RIDDLE_ASR_THREADS` | `4` | the voice server | Threads for one parakeet run. Runs are serialised anyway: two of them share one Metal context and make each other slower. |
 | `RIDDLE_VAD_FLOOR` | `0.012` | the voice server | The quietest thing the gate will call speech. Too low and the fridge is transcribed; too high and quiet speech is lost. |

@@ -78,10 +78,24 @@ is routed.
 | `GET /api/intent/<id>` | `{id, state, result}` |
 | `POST /api/note` | `{id}` — records a typed note |
 | `POST /api/send` | `{intent, diary}` — asks the diary for a turn |
+| `POST /api/login` | form-encoded `password`; `303` to `/` with the cookie, or the form again with `401` |
 | anything else | the built client, with index as the fallback so routing works |
 
 There is deliberately **no route for `var/audio`**. Those files are a
 recording of a room.
+
+### The gate
+
+With `RIDDLE_WEB_PASSWORD` unset there is none, which is the loopback case.
+Set it and every route above except `GET /api/health` needs the cookie
+`riddle=hmac(password, "riddle-v1")`: a browser gets the login page with a
+`401`, anything under `/api/` gets `{"error":"locked"}`, and `/ws/*` is
+refused *before* the upgrade — a page handed a live socket believes it is in.
+
+A cookie rather than HTTP Basic because the browser's WebSocket API cannot
+send an `Authorization` header, and `/ws/events` is the whole feed and the
+send path both. The token is one-way and deterministic: a restart logs nobody
+out, nothing is stored on disk, and changing the password is what revokes it.
 
 ### `/ws/events` — text, both ways
 
