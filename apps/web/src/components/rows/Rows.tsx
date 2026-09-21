@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { InkDots, NibStroke, StatusLine } from '@/components/Status'
 import { Card } from '@/components/ui/card'
 import {
   Dialog,
@@ -6,7 +7,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { DiaryEvent } from '@/lib/protocol'
 
 function clock(wall: number) {
@@ -61,6 +61,7 @@ function Capture({
   className?: string
 }) {
   const [missing, setMissing] = useState(false)
+  const [inked, setInked] = useState(false)
   const src = captureSrc(path)
   if (missing)
     return (
@@ -71,12 +72,20 @@ function Capture({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <button type="button" className="mt-1 block w-full cursor-zoom-in">
+        <button
+          type="button"
+          className="mt-1 block w-full cursor-zoom-in transition-transform duration-150 ease-out active:scale-[0.99]"
+        >
           <img
             src={src}
             alt={alt}
             onError={() => setMissing(true)}
-            className={`w-full object-contain ${INK} ${className ?? ''}`}
+            onLoad={() => setInked(true)}
+            // A capture arrives after its row does. Fading it in over the
+            // space already reserved for it means the row does not jump.
+            className={`w-full object-contain transition-opacity duration-300 ease-out ${
+              inked ? 'opacity-100' : 'opacity-0'
+            } ${INK} ${className ?? ''}`}
             loading="lazy"
           />
         </button>
@@ -112,7 +121,7 @@ function Row({
   className?: string
 }) {
   const card = (
-    <Card className={`gap-2 px-4 py-3 ${className}`}>
+    <Card className={`row-in gap-2 px-4 py-3 ${className}`}>
       <div className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
         <span className="uppercase tracking-wide">{label}</span>
         <time className="tabular-nums">{clock(at)}</time>
@@ -174,7 +183,10 @@ export function NoteRow({ event }: { event: DiaryEvent }) {
   )
 }
 
-export function ReplyRow({ event }: { event: DiaryEvent }) {
+/** `fresh` is set only for the newest row. One reply writing itself on is
+ *  worth watching; a screen of resumed history all wiping in at once is
+ *  not. */
+export function ReplyRow({ event, fresh }: { event: DiaryEvent; fresh?: boolean }) {
   return (
     <Row
       at={event.wall_ms}
@@ -182,17 +194,27 @@ export function ReplyRow({ event }: { event: DiaryEvent }) {
       side="theirs"
       className="max-w-[85%] border-foreground/15 bg-muted/40"
     >
-      <p className="text-sm leading-relaxed">{emphasise(event.text ?? '')}</p>
+      <p className={`text-sm leading-relaxed ${fresh ? 'ink-reveal' : ''}`}>
+        {emphasise(event.text ?? '')}
+      </p>
     </Row>
   )
 }
 
+/** Which of the three motifs a `tool` row gets, from the verb the loop put in
+ *  `meta.doing`. Matched on a stem rather than a list, because the loop is
+ *  free to invent a verb and an unknown one should still look like work
+ *  rather than like nothing: thinking is the fallback, and thinking is what
+ *  anything unrecognised is doing. */
+function motifFor(doing: string) {
+  if (/eras|rubb|clear|wip/.test(doing)) return <NibStroke back />
+  if (/writ|draw|ink|sketch|answer/.test(doing)) return <NibStroke />
+  return <InkDots />
+}
+
 export function ToolRow({ event }: { event: DiaryEvent }) {
-  return (
-    <p className="px-1 text-xs text-muted-foreground">
-      the diary is {String(event.meta.doing ?? event.text ?? 'thinking')}
-    </p>
-  )
+  const doing = String(event.meta.doing ?? event.text ?? 'thinking')
+  return <StatusLine motif={motifFor(doing)}>the diary is {doing}</StatusLine>
 }
 
 export function ErrorRow({ event }: { event: DiaryEvent }) {
@@ -206,12 +228,25 @@ export function ErrorRow({ event }: { event: DiaryEvent }) {
 export function PendingRow({ text, failed }: { text: string; failed?: boolean }) {
   return (
     <div className="flex justify-end">
-      <Card className="max-w-[85%] gap-2 px-4 py-3 opacity-70">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+      <Card
+        // Keyed on the outcome so a send that fails re-enters and nudges
+        // once, instead of quietly relabelling itself where you are not
+        // looking. The row stays faded until the server's own copy replaces
+        // it: this one is a promise, not a record.
+        key={failed ? 'failed' : 'sending'}
+        className={`max-w-[85%] gap-2 px-4 py-3 transition-opacity duration-200 ${
+          failed ? 'nudge border-destructive/40 opacity-90' : 'row-in opacity-70'
+        }`}
+      >
+        <div
+          className={`text-xs uppercase tracking-wide ${
+            failed ? 'text-destructive' : 'text-muted-foreground'
+          }`}
+        >
           {failed ? 'not delivered' : 'sending'}
         </div>
         <p className="text-sm leading-relaxed">{text}</p>
-        {!failed && <Skeleton className="h-3 w-24" />}
+        {!failed && <span className="ink-sweep h-1 w-24 text-muted-foreground" />}
       </Card>
     </div>
   )

@@ -30,6 +30,7 @@ export function EraseButton() {
         variant="ghost"
         disabled={!ready}
         onClick={() => setAsking(true)}
+        className="group"
         aria-label="Erase this conversation"
         title={
           ready
@@ -37,7 +38,10 @@ export function EraseButton() {
             : 'The diary is not running, so nothing can rub the page out.'
         }
       >
-        <Eraser className="size-4" />
+        {/* The eraser tips into the page on hover, the way you would hold
+            it. It is the only destructive control here; a hair of motion is
+            what says so before the dialog does. */}
+        <Eraser className="size-4 transition-transform duration-200 ease-out group-hover:-rotate-12 group-active:scale-90" />
       </Button>
       <Dialog open={asking} onOpenChange={setAsking}>
         <DialogContent>

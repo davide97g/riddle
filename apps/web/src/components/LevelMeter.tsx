@@ -45,10 +45,18 @@ export function LevelMeter({
           ref={(el) => {
             bars.current[i] = el
           }}
-          className={`h-full w-[3px] origin-center rounded-full transition-colors ${
-            live ? 'bg-emerald-500' : 'bg-muted-foreground/40'
+          className={`h-full w-[3px] origin-center rounded-full ${
+            live ? 'bg-live' : 'bg-muted-foreground/40'
           }`}
-          style={{ transform: 'scaleY(0.12)' }}
+          // The transform is written every frame while live, so it cannot be
+          // transitioned then -- the meter would lag the room. Off, the same
+          // bars settle back to rest instead of dropping to it.
+          style={{
+            transform: 'scaleY(0.12)',
+            transition: live
+              ? 'background-color 200ms'
+              : 'background-color 200ms, transform 280ms var(--ease-lift)',
+          }}
         />
       ))}
     </div>

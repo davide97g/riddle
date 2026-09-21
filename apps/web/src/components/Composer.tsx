@@ -38,9 +38,13 @@ export function Composer() {
           placeholder={
             mic.state === 'recording' ? 'listening...' : 'say something to the diary'
           }
-          className="max-h-32 min-h-11 flex-1 resize-none"
+          className="max-h-32 min-h-11 flex-1 resize-none transition-[border-color,box-shadow] duration-200 ease-out"
         />
-        <Button onClick={send} disabled={offline || !state.diary.present} className="h-11">
+        <Button
+          onClick={send}
+          disabled={offline || !state.diary.present}
+          className="h-11 transition-transform duration-150 ease-out active:scale-[0.97] disabled:active:scale-100"
+        >
           Send
         </Button>
       </div>
@@ -58,7 +62,12 @@ export function Composer() {
             disabled={mic.state !== 'idle'}
           />
         )}
-        <p className="text-center text-xs text-muted-foreground">
+        {/* Keyed on the sentence: the reason you cannot send changes while
+            you are reading it, and a swap without a fade reads as a glitch. */}
+        <p
+          key={`${state.diary.present}-${state.listening}`}
+          className="row-in text-center text-xs text-muted-foreground"
+        >
           {!state.diary.present
             ? 'The diary is not running, so nothing would answer a send.'
             : !state.listening

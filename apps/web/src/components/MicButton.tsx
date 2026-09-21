@@ -26,11 +26,22 @@ export function MicButton({
       disabled={disabled || busy}
       onClick={() => (recording ? stop() : start())}
       aria-label={recording ? 'Stop listening' : 'Start listening'}
-      className={`size-11 shrink-0 rounded-full ${
-        recording ? 'ring-2 ring-emerald-500/60 ring-offset-2 ring-offset-background' : ''
+      // The press shrinks under the thumb and the halo only exists while
+      // something is being recorded, so the one animated thing in the
+      // composer is the one thing that is running.
+      className={`relative size-11 shrink-0 rounded-full transition-transform duration-150 ease-out active:scale-95 ${
+        recording ? 'mic-live ring-2 ring-live/60 ring-offset-2 ring-offset-background' : ''
       } ${busy ? 'opacity-60' : ''}`}
     >
-      {recording ? <Square className="size-4 fill-current" /> : <Mic className="size-5" />}
+      {/* Keyed so the two glyphs cross rather than cut: the square turns in
+          as the nib turns out, which is the same gesture as pressing it. */}
+      <span key={recording ? 'stop' : 'go'} className="mic-swap">
+        {recording ? (
+          <Square className="size-4 fill-current" />
+        ) : (
+          <Mic className="size-5" />
+        )}
+      </span>
     </Button>
   )
 }

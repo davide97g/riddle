@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Skeleton } from '@/components/ui/skeleton'
+import { InkWave, StatusLine } from '@/components/Status'
 import { useDiary } from '@/state/RiddleProvider'
 import { rowsInOrder } from '@/state/reducer'
 import {
@@ -21,6 +21,12 @@ export function Timeline() {
   const box = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
 
+  // Only the newest reply writes itself on. Two hundred rows of resumed
+  // history all doing it at once is a page tearing itself apart, and the
+  // last row is the one the eye is on anyway -- on a reload it marks where
+  // the conversation had got to, which is worth a beat of motion.
+  const newest = rows.at(-1)?.id
+
   useEffect(() => {
     const el = box.current
     if (el && stick.current) el.scrollTop = el.scrollHeight
@@ -40,14 +46,18 @@ export function Timeline() {
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-3">
         {rows.length === 0 && (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            Nothing yet. Write on the tablet, or say something.
-          </p>
+          <div className="row-in flex flex-col items-center gap-3 py-16">
+            <span className="splash-rule h-px w-24 bg-foreground/15" />
+            <p className="text-center text-sm text-muted-foreground">
+              Nothing yet. Write on the tablet, or say something.
+            </p>
+          </div>
         )}
         {rows.map((row) => {
           if (row.kind === 'pending')
             return <PendingRow key={row.id} text={row.text} failed={row.failed} />
           const event = row.event
+          const now = row.id === newest
           switch (event.kind) {
             case 'strokes':
               return <PenStrokeRow key={row.id} event={event} />
@@ -58,7 +68,7 @@ export function Timeline() {
             case 'note':
               return <NoteRow key={row.id} event={event} />
             case 'reply':
-              return <ReplyRow key={row.id} event={event} />
+              return <ReplyRow key={row.id} event={event} fresh={now} />
             case 'tool':
               return <ToolRow key={row.id} event={event} />
             case 'error':
@@ -68,15 +78,12 @@ export function Timeline() {
           }
         })}
         {state.reading.map((clip) => (
-          <div key={clip} className="flex flex-col gap-2 rounded-xl border px-4 py-3">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              reading that back
-            </span>
-            <Skeleton className="h-4 w-3/4" />
-          </div>
+          <StatusLine key={clip} motif={<InkWave />}>
+            reading that back
+          </StatusLine>
         ))}
         {state.hearing && state.reading.length === 0 && (
-          <p className="px-1 text-xs text-muted-foreground">listening...</p>
+          <StatusLine motif={<InkWave />}>listening</StatusLine>
         )}
       </div>
     </div>

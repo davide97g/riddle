@@ -7,6 +7,10 @@
 
 @theme inline {
     --font-heading: var(--font-sans);
+    /* The one colour on an otherwise grey page: something is live. It was
+       emerald-500 spelled out in four places; it is a token now so the mic,
+       the meter and the badge cannot drift apart. */
+    --color-live: var(--live);
     --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -81,6 +85,7 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    --live: oklch(0.696 0.17 162.48);
 }
 
 .dark {
@@ -115,6 +120,9 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    /* Lighter, not the same green dimmed: emerald-500 on near-black reads
+       muddy and fails contrast against the card. */
+    --live: oklch(0.765 0.153 163.2);
 }
 
 @layer base {
@@ -126,5 +134,463 @@
     }
   html {
     @apply font-sans;
+    }
+}
+/* ---------------------------------------------------------------------------
+   Motion.
+
+   One material: ink going down on paper, or coming off it. Everything that
+   moves on this page is a stroke being laid, a page being turned, or a mark
+   settling into place -- there is no fade-and-slide vocabulary borrowed from
+   somewhere else, because the thing this app does is draw.
+
+   Two curves and three durations, and nothing invents its own. Entering uses
+   `--ease-nib`, which is a pen touching down and easing off; leaving uses
+   `--ease-lift`, which is the nib coming away, and is always the shorter of
+   the two. A state change that takes longer than `--t-state` is a state
+   change you are waiting on.
+
+   Every loop here is idle chatter -- it says "still working", never how far
+   along. Nothing below reports progress it does not have.
+   --------------------------------------------------------------------------- */
+
+:root {
+    --ease-nib: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-lift: cubic-bezier(0.4, 0, 1, 1);
+    --t-tap: 120ms;
+    --t-state: 220ms;
+    --t-enter: 320ms;
+}
+
+/* -- strokes ---------------------------------------------------------------- */
+
+/* The `from` is the element's own dashoffset: the wordmark's strokes are all
+   different lengths and each carries its own. */
+@keyframes ink-draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* The rule under the splash wordmark, drawn after the word is written. */
+.splash-rule {
+    transform: scaleX(0);
+    transform-origin: center;
+    animation: rule-draw 620ms var(--ease-nib) 820ms forwards;
+}
+
+@keyframes rule-draw {
+    to {
+        transform: scaleX(1);
+    }
+}
+
+/* -- rows ------------------------------------------------------------------- */
+
+@keyframes row-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+}
+
+.row-in {
+    animation: row-in var(--t-state) var(--ease-nib) both;
+}
+
+@keyframes drop-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+}
+
+.drop-in {
+    animation: drop-in var(--t-enter) var(--ease-nib) both;
+}
+
+/* A reply arrives written, not typed: the words come in under a soft edge
+   travelling left to right, the way they appear on the tablet. The mask is
+   three times the width of the text so the gradient's opaque end can sit
+   entirely off one side of it. */
+.ink-reveal {
+    -webkit-mask-image: linear-gradient(
+        90deg,
+        #000 0 30%,
+        rgb(0 0 0 / 40%) 48%,
+        transparent 62%
+    );
+    mask-image: linear-gradient(90deg, #000 0 30%, rgb(0 0 0 / 40%) 48%, transparent 62%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation: ink-reveal 560ms var(--ease-nib) both;
+}
+
+@keyframes ink-reveal {
+    from {
+        -webkit-mask-position: 100% 0;
+        mask-position: 100% 0;
+    }
+    to {
+        -webkit-mask-position: 0 0;
+        mask-position: 0 0;
+    }
+}
+
+/* Not delivered. One nudge, once: a row that keeps shaking is a row shouting. */
+@keyframes nudge {
+    20% {
+        transform: translateX(-3px);
+    }
+    40% {
+        transform: translateX(3px);
+    }
+    60% {
+        transform: translateX(-2px);
+    }
+    80% {
+        transform: translateX(1px);
+    }
+}
+
+.nudge {
+    animation: nudge 320ms var(--ease-lift) both;
+}
+
+/* In flight to the loop. A wet stroke, not a grey box. */
+.ink-sweep {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: color-mix(in oklab, currentColor 16%, transparent);
+}
+
+.ink-sweep::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, currentColor, transparent);
+    opacity: 0.45;
+    transform: translateX(-100%);
+    animation: ink-sweep 1.15s var(--ease-nib) infinite;
+}
+
+@keyframes ink-sweep {
+    to {
+        transform: translateX(100%);
+    }
+}
+
+/* -- status motifs ---------------------------------------------------------- */
+
+.ink-dot {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ink-dot 1.25s ease-in-out infinite;
+}
+
+@keyframes ink-dot {
+    0%,
+    55%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+    27% {
+        transform: translateY(-2.5px);
+        opacity: 1;
+    }
+}
+
+.nib-lay {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: nib-lay 1.6s var(--ease-nib) infinite;
+}
+
+@keyframes nib-lay {
+    0% {
+        stroke-dashoffset: 100;
+        opacity: 1;
+    }
+    55%,
+    78% {
+        stroke-dashoffset: 0;
+        opacity: 1;
+    }
+    100% {
+        stroke-dashoffset: 0;
+        opacity: 0;
+    }
+}
+
+/* Rubbing out: the same stroke, going the other way and off the left. */
+.nib-lift {
+    stroke-dasharray: 100;
+    animation: nib-lift 1.4s var(--ease-lift) infinite;
+}
+
+@keyframes nib-lift {
+    0% {
+        stroke-dashoffset: 0;
+    }
+    70%,
+    100% {
+        stroke-dashoffset: -100;
+    }
+}
+
+.ink-bar {
+    height: 100%;
+    transform: scaleY(0.25);
+    transform-origin: center;
+    animation: ink-bar 1.05s ease-in-out infinite;
+}
+
+@keyframes ink-bar {
+    0%,
+    100% {
+        transform: scaleY(0.25);
+    }
+    50% {
+        transform: scaleY(1);
+    }
+}
+
+/* -- the connection dot ------------------------------------------------------ */
+
+/* Open: a slow breath, so a live page is never quite still.
+   Connecting: a ping going out and getting nothing back. */
+.conn-breathe {
+    animation: conn-breathe 2.8s ease-in-out infinite;
+}
+
+@keyframes conn-breathe {
+    50% {
+        opacity: 0.45;
+    }
+}
+
+.conn-ping {
+    position: relative;
+}
+
+.conn-ping::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: inherit;
+    animation: conn-ping 1.8s var(--ease-lift) infinite;
+}
+
+@keyframes conn-ping {
+    from {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+    70%,
+    100% {
+        transform: scale(2.8);
+        opacity: 0;
+    }
+}
+
+/* -- the microphone ---------------------------------------------------------- */
+
+.mic-live::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 9999px;
+    border: 2px solid var(--live);
+    pointer-events: none;
+    animation: mic-pulse 1.7s var(--ease-lift) infinite;
+}
+
+@keyframes mic-pulse {
+    from {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+    75%,
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+
+/* The mic glyph turning over. Not a fade: the two shapes mean opposite
+   things and a crossfade makes them briefly mean neither. */
+.mic-swap {
+    display: inline-flex;
+    animation: mic-swap 200ms var(--ease-nib) both;
+}
+
+@keyframes mic-swap {
+    from {
+        opacity: 0;
+        transform: rotate(-35deg) scale(0.7);
+    }
+}
+
+/* -- the diary --------------------------------------------------------------- */
+
+/* Shut, the book is the right half of this box and slides across to sit in
+   the middle of it; opened, the spine stays put and the cover swings off to
+   the left, which is the half the box was keeping free. Closing is quicker
+   than opening, and on the way shut the ruled lines go first. */
+.diary {
+    position: relative;
+    display: inline-block;
+    width: 26px;
+    height: 14px;
+    flex: none;
+    perspective: 70px;
+}
+
+.diary-book {
+    position: absolute;
+    inset: 0;
+    transform: translateX(-25%);
+    transform-style: preserve-3d;
+    transition: transform 480ms var(--ease-nib);
+}
+
+.diary[data-open] .diary-book {
+    transform: translateX(0);
+}
+
+.diary-page {
+    position: absolute;
+    inset: 0 0 0 50%;
+    border: 1px solid currentColor;
+    border-radius: 1px 3px 3px 1px;
+    opacity: 0.5;
+}
+
+.diary-rule {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 140ms var(--ease-lift);
+}
+
+.diary-rule:nth-child(1) {
+    top: 2px;
+}
+.diary-rule:nth-child(2) {
+    top: 5.5px;
+}
+.diary-rule:nth-child(3) {
+    top: 9px;
+}
+
+.diary[data-open] .diary-rule {
+    transform: scaleX(1);
+    transition: transform 300ms var(--ease-nib);
+}
+
+.diary[data-open] .diary-rule:nth-child(1) {
+    transition-delay: 230ms;
+}
+.diary[data-open] .diary-rule:nth-child(2) {
+    transition-delay: 300ms;
+}
+.diary[data-open] .diary-rule:nth-child(3) {
+    transition-delay: 370ms;
+}
+
+.diary-cover {
+    position: absolute;
+    inset: 0 0 0 50%;
+    transform-origin: left center;
+    transform-style: preserve-3d;
+    transform: rotateY(0deg);
+    transition: transform 340ms var(--ease-lift);
+}
+
+.diary[data-open] .diary-cover {
+    transform: rotateY(-170deg);
+    transition: transform 520ms var(--ease-nib);
+}
+
+.diary-face {
+    position: absolute;
+    inset: 0;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+/* Board, with the elastic down the fore edge. */
+.diary-face-front {
+    background: currentColor;
+    border-radius: 1px 3px 3px 1px;
+}
+
+.diary-face-front::after {
+    content: '';
+    position: absolute;
+    inset: 1px 2px 1px auto;
+    width: 1px;
+    background: var(--background);
+    opacity: 0.6;
+}
+
+/* Past ninety degrees you are looking at the inside of the cover, which is
+   paper. */
+.diary-face-back {
+    transform: rotateY(180deg);
+    border: 1px solid currentColor;
+    border-radius: 3px 1px 1px 3px;
+    opacity: 0.4;
+}
+
+/* -- quiet ------------------------------------------------------------------- */
+
+/* Nothing here carries meaning that the still frame does not, so all of it
+   can go. The level meter is driven from a ref rather than a keyframe and
+   opts out separately, in its own component: it is a reading, not a flourish. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+    }
+
+    /* A loop cut to one frame lands wherever its last keyframe left it, and
+       half of these end deliberately invisible. Put them back on the page as
+       the still marks they stand for. */
+    .nib-lay,
+    .nib-lift {
+        stroke-dashoffset: 0 !important;
+        opacity: 1 !important;
+    }
+
+    .ink-dot {
+        opacity: 1 !important;
+    }
+
+    .ink-bar {
+        transform: scaleY(0.6) !important;
+    }
+
+    .splash-rule {
+        transform: scaleX(1) !important;
+    }
+
+    .ink-sweep::after {
+        display: none;
     }
 }
