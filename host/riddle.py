@@ -15,10 +15,11 @@ from pathlib import Path
 import hershey
 import notebook
 import render
-from device import Device, PenUp, Sample
 from geometry import SCREEN_H, SCREEN_W
-from style import Palette
+import recall
+from device import Device, PenUp, Sample
 from llm import Diary
+from style import Palette
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE_MARGIN = 70
@@ -37,10 +38,12 @@ class Session:
             body=env("RIDDLE_FONT_BODY", "futural"),
             accent=env("RIDDLE_FONT_ACCENT", "scripts"),
         )
+        self.memory = recall.Memory(ROOT / "memories.txt")
         self.diary = Diary(
             model=env("RIDDLE_MODEL", "claude-sonnet-5"),
             max_words=int(env("RIDDLE_MAX_WORDS", "22")),
             session_file=ROOT / ".riddle_session",
+            memory=self.memory,
         )
         self.device = Device(host=env("RM2_SSH_HOST", "rm2"))
         self.strokes: list[list[tuple[float, float]]] = []
@@ -51,16 +54,43 @@ class Session:
         # once the pen has actually been lifted.
         self.pen_down = False
         self.turn = 0
+        # Set while the diary is erasing and writing, so the page watcher does
+        # not mistake the diary's own work for the writer clearing the page.
+        self.answering = threading.Event()
+
+    def forget(self, reason: str) -> None:
+        """Start a new conversation, keeping only what was written to memory."""
+        self.diary.forget()
+        print(f"{reason}: forgetting the conversation", file=sys.stderr)
 
     def run(self) -> None:
+        host = env("RM2_SSH_HOST", "rm2")
         target = env("RIDDLE_NOTEBOOK", "Notebook")
-        uuid = notebook.find(target, env("RM2_SSH_HOST", "rm2"))
+        uuid = notebook.find(target, host)
         found = f"({uuid[:8]})" if uuid else "(not found on device)"
+        kept = len(self.memory.lines())
         print(
             f"diary open, writing into whatever page is on screen. "
             f"keep {target!r} {found} open. write, then pause.",
             file=sys.stderr,
         )
+        print(
+            f"remembering {kept} thing(s) from before"
+            if kept
+            else "no memories yet",
+            file=sys.stderr,
+        )
+
+        # Turning to a new page, or wiping this one, should cost the diary the
+        # conversation but not its memory. xochitl only writes a page out when
+        # you leave it, so this notices shortly after the fact rather than as
+        # it happens.
+        page = recall.Page(host)
+        threading.Thread(
+            target=recall.watch,
+            args=(page, self.forget, self.answering.is_set),
+            daemon=True,
+        ).start()
         while True:
             try:
                 event = self.device.events.get(timeout=0.1)
@@ -87,6 +117,13 @@ class Session:
                 self.answer()
 
     def answer(self) -> None:
+        self.answering.set()
+        try:
+            self._answer()
+        finally:
+            self.answering.clear()
+
+    def _answer(self) -> None:
         written, self.strokes = self.strokes, []
         box = render.bounding_box(written)
         # Each turn gets its own file. The conversation is resumed across
