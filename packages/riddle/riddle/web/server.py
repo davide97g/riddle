@@ -1,0 +1,301 @@
+"""The page you speak into, and the socket it speaks over.
+
+This process never touches the tablet. It reads and writes the store, and the
+loop -- which owns the ssh pipe -- picks up anything that wants ink by draining
+the `intents` table. That is why there is no lock anywhere here and no second
+`Device`: the two halves share a file, not a device.
+
+Everything the page shows is derived by tailing the store rather than by being
+told. One code path serves the live feed and the history, so a reload
+reconstructs the screen from the same query that fills it in the first place.
+"""
+
+import json
+import mimetypes
+import os
+import time
+import urllib.parse
+from pathlib import Path
+
+from riddle.web import wsock
+
+POLL_S = 0.25  # how often the store is tailed for anything new
+
+INDEX_FALLBACK = b"""<!doctype html><meta charset=utf-8>
+<title>riddle</title><body style="font:16px system-ui;padding:3rem;max-width:34rem">
+<h1>riddle</h1><p>The page has not been built yet.</p>
+<pre>cd web &amp;&amp; bun install &amp;&amp; bun run build</pre>
+<p>The api and the socket are already up.</p>
+"""
+
+
+class Hub:
+    """Everyone currently looking at the diary."""
+
+    def __init__(self, store) -> None:
+        self.store = store
+        self.control: set[wsock.Socket] = set()
+        self.seen = 0
+
+    async def say(self, message: dict) -> None:
+        if not self.control:
+            return
+        body = json.dumps(message)
+        for sock in list(self.control):
+            if not sock.open:
+                self.control.discard(sock)
+                continue
+            await sock.send(body)
+
+    async def tail(self) -> None:
+        """Push anything new in the store out to every open page.
+
+        The loop and the ears write rows; nobody notifies anybody. Polling a
+        local sqlite file four times a second costs less than the machinery
+        that would avoid it, and it means a page that reconnects catches up
+        through exactly the same path.
+        """
+        import asyncio
+
+        while True:
+            await asyncio.sleep(POLL_S)
+            try:
+                fresh = self.store.since_id(self.seen)
+            except Exception as exc:  # the loop may be mid-write, or gone
+                print(f"tail: {exc}", flush=True)
+                continue
+            for event in fresh:
+                self.seen = event["id"]
+                await self.say({"type": "event", **event})
+
+
+class Server:
+    def __init__(self, store, root: Path, web_dir: Path, ears=None) -> None:
+        self.store = store
+        self.root = root
+        self.web_dir = web_dir
+        self.hub = Hub(store)
+        self.ears = ears
+
+    # --- http ------------------------------------------------------------
+
+    async def handle(self, reader, writer) -> None:
+        try:
+            request = await _read_request(reader)
+        except (ConnectionResetError, ValueError):
+            writer.close()
+            return
+        if request is None:
+            writer.close()
+            return
+        method, target, headers, body = request
+        path, _, raw_query = target.partition("?")
+        query = dict(urllib.parse.parse_qsl(raw_query))
+
+        if os.environ.get("RIDDLE_WEB_DEBUG"):
+            print(f"{method} {path} ws={wsock.wanted(headers)}", flush=True)
+        try:
+            if path.startswith("/ws/") and wsock.wanted(headers):
+                await self.socket(reader, writer, headers, path, query)
+                return
+            await self.route(writer, method, path, query, body)
+        except (ConnectionResetError, BrokenPipeError):
+            pass
+        finally:
+            if not path.startswith("/ws/"):
+                writer.close()
+
+    async def route(self, writer, method, path, query, body) -> None:
+        if path == "/api/health":
+            return _json(writer, {"ok": True, "session": self.store.session_id})
+
+        if path == "/api/state":
+            return _json(
+                writer,
+                {
+                    "session": self.store.session_id,
+                    "now_ms": self.store.now_ms(),
+                    "started_ms": self.store.started_ms,
+                    "listening": self.ears is not None,
+                },
+            )
+
+        if path == "/api/events":
+            since = int(query.get("since", 0))
+            limit = min(500, int(query.get("limit", 200)))
+            return _json(writer, {"events": self.store.since_id(since, limit)})
+
+        if path.startswith("/api/captures/"):
+            return self.file(writer, self.root / "captures", path[len("/api/captures/"):])
+
+        if method == "POST" and path in ("/api/send", "/api/note"):
+            payload = json.loads(body or b"{}")
+            if path == "/api/note":
+                text = " ".join(str(payload.get("text", "")).split())
+                if not text:
+                    return _json(writer, {"error": "empty note"}, status="400 Bad Request")
+                return _json(writer, {"id": self.store.add_event("note", text=text)})
+            at_ms = int(payload.get("at_ms", self.store.now_ms()))
+            intent = self.store.push_intent(
+                "web", "send", {"at_ms": at_ms, "draft": payload.get("draft")}
+            )
+            return _json(writer, {"intent": intent})
+
+        if path.startswith("/api/"):
+            return _json(writer, {"error": "no such route"}, status="404 Not Found")
+
+        return self.page(writer, path)
+
+    def page(self, writer, path: str) -> None:
+        """Serve the built app, falling back to index so routing works."""
+        if not self.web_dir.is_dir():
+            return _send(writer, INDEX_FALLBACK, "text/html; charset=utf-8")
+        if path not in ("/", ""):
+            served = self.file(writer, self.web_dir, path.lstrip("/"), quiet=True)
+            if served:
+                return None
+        index = self.web_dir / "index.html"
+        if index.is_file():
+            return _send(writer, index.read_bytes(), "text/html; charset=utf-8")
+        return _send(writer, INDEX_FALLBACK, "text/html; charset=utf-8")
+
+    def file(self, writer, base: Path, rel: str, quiet: bool = False) -> bool:
+        """Serve one file from under `base`, and nothing from outside it.
+
+        A hand written static server is exactly where path traversal lives, so
+        the check is on the resolved path rather than on the spelling.
+        """
+        target = (base / urllib.parse.unquote(rel)).resolve()
+        if not target.is_relative_to(base.resolve()) or not target.is_file():
+            if quiet:
+                return False
+            _send(writer, b"not found", "text/plain", status="404 Not Found")
+            return True
+        kind = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        cache = "public, max-age=31536000, immutable" if "/assets/" in rel or rel.startswith("assets/") else "no-cache"
+        _send(writer, target.read_bytes(), kind, extra={"Cache-Control": cache})
+        return True
+
+    # --- sockets ---------------------------------------------------------
+
+    async def socket(self, reader, writer, headers: dict, path: str, query: dict) -> None:
+        sock = await wsock.Socket.upgrade(reader, writer, headers)
+        if path == "/ws/events":
+            await self.control(sock)
+        elif path == "/ws/audio":
+            await self.audio(sock, query)
+        else:
+            await sock.close(1003, "no such socket")
+
+    async def control(self, sock: wsock.Socket) -> None:
+        self.hub.control.add(sock)
+        try:
+            await sock.send(
+                json.dumps(
+                    {
+                        "type": "hello.ok",
+                        "session": self.store.session_id,
+                        "started_ms": self.store.started_ms,
+                        "now_ms": self.store.now_ms(),
+                        "listening": self.ears is not None,
+                    }
+                )
+            )
+            async for raw in sock:
+                if isinstance(raw, bytes):
+                    continue  # the control socket is text; audio has its own
+                await self.said(sock, json.loads(raw))
+        except json.JSONDecodeError:
+            await sock.close(1003, "not json")
+        finally:
+            self.hub.control.discard(sock)
+
+    async def said(self, sock: wsock.Socket, msg: dict) -> None:
+        kind = msg.get("type")
+        if kind == "ping":
+            return await sock.send(json.dumps({"type": "pong", "t": msg.get("t")}))
+        if kind == "hello":
+            since = int(msg.get("since", 0))
+            for event in self.store.since_id(since, int(msg.get("limit", 500))):
+                self.hub.seen = max(self.hub.seen, event["id"])
+                await sock.send(json.dumps({"type": "event", **event}))
+            return
+        if kind == "note":
+            text = " ".join(str(msg.get("text", "")).split())
+            if text:
+                self.store.add_event("note", text=text)
+            return
+        if kind == "send":
+            at_ms = int(msg.get("at_ms", self.store.now_ms()))
+            self.store.push_intent(
+                "web", "send", {"at_ms": at_ms, "draft": msg.get("draft")}
+            )
+            return
+        await sock.send(json.dumps({"type": "error", "message": f"unknown {kind!r}"}))
+
+    async def audio(self, sock: wsock.Socket, query: dict) -> None:
+        """Take PCM until the page stops sending it.
+
+        Opening this socket is what starts a recording and closing it is what
+        ends one, so there is no start or stop message to fall out of step with
+        what the microphone is actually doing.
+        """
+        if self.ears is None:
+            await sock.close(1011, "this diary has no ears yet")
+            return
+        rate = int(query.get("rate", 16000))
+        if rate != 16000:
+            await sock.close(1003, f"expected 16000 Hz, got {rate}")
+            return
+        capture = self.ears.begin(query.get("capture", str(int(time.time()))))
+        try:
+            async for chunk in sock:
+                if isinstance(chunk, bytes) and len(chunk) > 4:
+                    # 4 byte frame index, then int16 mono pcm. The index is
+                    # what places a segment where it was spoken rather than
+                    # where it happened to arrive.
+                    await capture.feed(
+                        int.from_bytes(chunk[:4], "little"), chunk[4:]
+                    )
+        finally:
+            await capture.done()
+
+
+async def _read_request(reader):
+    line = await reader.readline()
+    if not line:
+        return None
+    parts = line.decode("latin-1").split()
+    if len(parts) != 3:
+        return None
+    method, target, _ = parts
+
+    headers: dict[str, str] = {}
+    while True:
+        raw = await reader.readline()
+        if raw in (b"\r\n", b"\n", b""):
+            break
+        key, _, value = raw.decode("latin-1").partition(":")
+        headers[key.strip().lower()] = value.strip()
+
+    body = b""
+    length = int(headers.get("content-length", 0) or 0)
+    if length:
+        body = await reader.readexactly(length)
+    return method, target, headers, body
+
+
+def _send(writer, body: bytes, kind: str, status: str = "200 OK", extra=None) -> None:
+    head = [
+        f"HTTP/1.1 {status}",
+        f"Content-Type: {kind}",
+        f"Content-Length: {len(body)}",
+        "Connection: close",
+    ]
+    for key, value in (extra or {}).items():
+        head.append(f"{key}: {value}")
+    writer.write(("\r\n".join(head) + "\r\n\r\n").encode() + body)
+
+
+def _json(writer, payload, status: str = "200 OK") -> None:
+    _send(writer, json.dumps(payload).encode(), "application/json", status)

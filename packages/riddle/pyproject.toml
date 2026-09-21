@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "riddle"
+version = "0.1.0"
+description = "A Tom Riddle diary for the reMarkable 2"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "Davide Ghiotto" }]
+
+# The whole manifest. numpy does the thinning that turns an outline font into
+# a pen path and the energy gate that finds the edges of a sentence; pillow
+# rasterises the page for the model. Everything else -- the websocket, the
+# http server, the dotenv reader, the CLI -- is stdlib on purpose.
+dependencies = [
+    "numpy>=2.0",
+    "pillow>=11.0",
+]
+
+[project.scripts]
+riddle = "riddle.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["riddle*"]
+
+[tool.setuptools.package-data]
+# DancingScript-OFL.txt is the font's licence and must travel with the .ttf.
+"riddle.ink" = ["fonts/*.jhf", "fonts/*.ttf", "fonts/*.txt"]
+"riddle.store" = ["schema.sql"]
