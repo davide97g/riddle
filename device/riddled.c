@@ -261,6 +261,14 @@ int main(void) {
                 if (ev.type == EV_ABS && ev.code == ABS_X) { x = ev.value; dirty = 1; }
                 else if (ev.type == EV_ABS && ev.code == ABS_Y) { y = ev.value; dirty = 1; }
                 else if (ev.type == EV_ABS && ev.code == ABS_PRESSURE) { pressure = ev.value; dirty = 1; }
+                else if (ev.type == EV_KEY &&
+                         (ev.code == BTN_TOOL_PEN || ev.code == BTN_TOOL_RUBBER)) {
+                    // Which end of the pen is over the page. The host needs it
+                    // to tell writing from rubbing out: both arrive here as
+                    // ordinary strokes and only this says which is which.
+                    if (ev.value)
+                        printf("K %s\n", ev.code == BTN_TOOL_RUBBER ? "RUBBER" : "PEN");
+                }
                 else if (ev.type == EV_KEY && ev.code == BTN_TOUCH) {
                     touching = ev.value;
                     if (!touching) printf("U %ld\n", now_ms());

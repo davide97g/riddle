@@ -1,25 +1,54 @@
 # Secrets and machine-local state
 .env
-.riddle_session
 
-# Device backups. Contain the tablet's private keys, shell history and every
-# notebook. Never publish these.
-backup/rm2-*/
-backup/inventory-*/
-*.zip
-*.tar
-*.tar.gz
-
-# Captured pages: photographs of whatever was handwritten on the tablet.
-captures/
+# Everything the diary writes: photographs of the page, recordings of the
+# room, the store, the speech model, the cross-compiled agent, tablet
+# snapshots, pidfiles and logs. All of it is either private, enormous or
+# regenerable, and deleting the whole directory is a legitimate fix.
+var/
 
 # Build output and local tooling
-bin/
 .venv/
 
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+
+# The page you speak into: deps and build output. bun.lock is committed.
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.vite/
 
 # macOS
 .DS_Store
+
+# --- old locations, kept on purpose -------------------------------------
+# These moved under var/ in the reorganisation. The rules stay because a
+# working tree from before it -- or a snapshot restored by hand -- can still
+# put them back, and backup/rm2-* holds the tablet's private ssh keys, its
+# shell history and every notebook on it. A single `git add -A` with these
+# rules missing would publish all of that.
+# Unanchored on purpose: a device snapshot must stay ignored wherever it
+# lands, including a directory that was itself moved.
+**/rm2-2*/
+**/inventory-2*/
+backup/rm2-*/
+backup/inventory-*/
+captures/
+audio/
+models/
+riddle.db*
+memories.txt
+.riddle_session
+.riddle.pid
+.voice.pid
+riddle.log
+voice.log
+bin/
+web/node_modules/
+web/dist/
+web/.vite/
+*.zip
+*.tar
+*.tar.gz
