@@ -79,10 +79,24 @@ PAGE_ATTACHED = (
 # taken before the diary erases, because by the time the model is asked the
 # writing is already fading off the page.
 WHOLE_PAGE = (
-    "The photograph above is cropped to what they have just written. The rest "
-    "of the page is not in it: earlier writing, your own replies still sitting "
-    "there, whatever a stray arrow points at. If you cannot answer this turn "
-    "without seeing that, call look_at_page once. Most turns do not need it."
+    "Be clear about what that photograph is: it is *only the strokes they "
+    "have just added*. Everything already on the page has been left out of "
+    "it, including your own earlier replies. So if they have circled, "
+    "underlined, crossed out, corrected or pointed an arrow at something, "
+    "the thing itself is not in the picture and the circle will look empty. "
+    "It is not empty. Call look_at_page, which hands you the whole page as "
+    "it stands, and answer from that. Never tell them something is blank or "
+    "missing without looking first. Writing that stands on its own needs no "
+    "look."
+)
+
+# What the loop noticed, when it noticed it. The loop knows where its own ink
+# is and where this turn's strokes are, so a page being marked up rather than
+# written on is arithmetic rather than a guess -- and it is the one case the
+# cropped photograph is actively misleading about.
+OVERLAPS = (
+    "This turn's strokes land on top of ink that was already on the page. "
+    "They are marking up something you cannot see. Call look_at_page."
 )
 
 # What the tool hands back, as the model is told to read it.
@@ -96,14 +110,16 @@ LOOK_AT_PAGE = {
     "function": {
         "name": "look_at_page",
         "description": (
-            "Look at the entire page on the tablet, not only the words just "
-            "written: everything above and below them, and the replies you "
-            "wrote earlier in this conversation, as it all stood the moment "
-            "the pen came up. Call this when what they wrote refers to "
-            "something not in the cropped photograph -- 'this', 'the one "
-            "above', an arrow, a correction to an earlier line, a diagram "
-            "they are adding to. Do not call it for writing that stands on "
-            "its own."
+            "Look at the entire page on the tablet as it stood the moment "
+            "the pen came up: everything above and below what they just "
+            "wrote, and your own earlier replies, none of which is in the "
+            "photograph attached to the turn. Call this whenever what they "
+            "wrote points at something that photograph does not contain -- "
+            "a circle or an arrow around existing ink, 'this', 'the one "
+            "above', a correction to an earlier line, a diagram being added "
+            "to. If a mark looks like it encloses nothing, that is this "
+            "tool's cue, not an answer. Do not call it for writing that "
+            "stands on its own."
         ),
         "parameters": {
             "type": "object",
@@ -163,6 +179,9 @@ class Question:
     # The whole page, photographed before the eraser ran. Not attached to the
     # turn: offered as `look_at_page`, and read only if the model asks.
     page: Path | None = None
+    # Whether this turn's strokes land on ink that was already there. The
+    # loop works it out; it is the case the crop lies about most.
+    overlaps: bool = False
     heard: list = None
     typed: list = None
 
@@ -175,6 +194,8 @@ class Question:
         lines = [PAGE_ATTACHED if self.image is not None else NO_PAGE]
         if self.page is not None:
             lines.append(WHOLE_PAGE)
+            if self.overlaps:
+                lines.append(OVERLAPS)
         for when, text in self.heard or []:
             lines.append(f"Heard in the room, {ago(when)}: \"{text}\"")
         for when, text in self.typed or []:

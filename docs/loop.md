@@ -103,6 +103,14 @@ Three things about the timing, all of them forced:
   not the turn.** The photograph is skipped, the tool is not offered, and the
   turn goes on.
 
+The loop also says when it can tell the crop is lying. It knows where its
+own ink is and where this turn's strokes are, so strokes that land on top of
+ink already on the page -- a circle drawn around the diary's last reply, an
+arrow reaching back into it -- are arithmetic, not a guess, and the turn says
+so in as many words. That is the one case the cropped photograph is actively
+misleading about: the circle arrives enclosing nothing, and a model that
+answers what it sees will say the circle is empty.
+
 The look is capped at one per turn: the page does not change while the turn
 runs, so a second look would photograph nothing new. When it happens, a
 `tool` row says so — `meta.doing` is `looking at the whole page` — and the

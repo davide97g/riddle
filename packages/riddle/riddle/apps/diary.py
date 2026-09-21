@@ -64,6 +64,31 @@ def travel(stroke: list[tuple[float, float]]) -> float:
     )
 
 
+def marks_up(written, page_ink) -> bool:
+    """Whether this turn's strokes land on ink that was already on the page.
+
+    Bounding boxes, not geometry: a circle drawn around a line of the diary's
+    own writing overlaps it by definition, and so does an arrow that reaches
+    it. What this is for is telling the model that the cropped photograph it
+    has been handed is missing the thing being marked -- an approximate yes
+    is worth far more there than an exact one.
+
+    Only the diary's own ink is known here. What the writer left on the page
+    before this turn was erased by the turn before it, so there is nothing
+    else to overlap.
+    """
+    here = render.bounding_box(written)
+    there = render.bounding_box(page_ink) if page_ink else None
+    if here is None or there is None:
+        return False
+    return not (
+        here[2] < there[0]
+        or here[0] > there[2]
+        or here[3] < there[1]
+        or here[1] > there[3]
+    )
+
+
 def crosses(stroke, pass_, radius: float) -> bool:
     """Whether an eraser pass went over a stroke."""
     sx = [x for x, _ in stroke]
@@ -579,6 +604,11 @@ class Session:
         # nothing, so that one waits -- a send that turns out to have nothing
         # to answer should not cost a ten-megabyte read off the tablet.
         page = self.photograph(turn) if written else None
+        # Worked out before the diary writes again, while `page_ink` is still
+        # what was on the page when the pen came up.
+        marked = bool(written) and marks_up(written, self.page_ink)
+        if marked:
+            print("this lands on ink that was already there", file=sys.stderr)
 
         # The ink has to start fading the moment you stop writing, so the model
         # runs while the page is being erased rather than after it. That also
@@ -620,7 +650,12 @@ class Session:
         if not written:
             page = self.photograph(turn)
         question = Question(
-            trigger=trigger, image=image, page=page, heard=heard, typed=typed
+            trigger=trigger,
+            image=image,
+            page=page,
+            overlaps=marked,
+            heard=heard,
+            typed=typed,
         )
         self.store.add_event("tool", turn=turn, meta={"doing": "thinking"})
         thinking = threading.Thread(
