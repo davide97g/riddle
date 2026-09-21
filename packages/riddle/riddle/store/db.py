@@ -180,12 +180,26 @@ class Store:
         return int(time.time() * 1000) - self.started_ms
 
     def close(self) -> None:
-        if self.role in ("loop", "voice"):
-            self.gone(self.role)
-        self.conn.execute(
-            "UPDATE sessions SET ended_ms = ? WHERE id = ?",
-            (int(time.time() * 1000), self.session_id),
-        )
+        """Say this half is gone, and end the session only if it was the last.
+
+        Ending it while the other half is still beating splits them: `join`
+        will not touch a session with an `ended_ms`, so the survivor keeps
+        writing into a row the newcomer cannot join, and the page and the loop
+        end up in different sessions with different clocks. That is exactly
+        what a `systemctl restart riddle-diary` does.
+
+        A reader never ends anything. It only ever looked.
+        """
+        if self.role not in ("loop", "voice"):
+            self.conn.close()
+            return
+        self.gone(self.role)
+        other = "voice" if self.role == "loop" else "loop"
+        if self.present(other) is None:
+            self.conn.execute(
+                "UPDATE sessions SET ended_ms = ? WHERE id = ?",
+                (int(time.time() * 1000), self.session_id),
+            )
         self.conn.close()
 
     @contextmanager
