@@ -10,7 +10,8 @@ A "Tom Riddle diary" for a reMarkable 2 tablet. You handwrite on a page, pause, 
 
 ```bash
 ./device/build.sh              # cross-compile riddled (zig cc, arm-linux-musleabihf, static) + scp to rm2
-./run.sh                       # start the diary loop (sources .env, uses ./.venv/bin/python)
+./diary.sh start|stop|status|log|restart   # run the loop in the background with a pidfile
+./run.sh                       # same loop in the foreground (sources .env, uses ./.venv/bin/python)
 
 # Tools (each refuses to draw without --yes; see host/tools/guard.py)
 ./.venv/bin/python host/tools/clear_page.py --yes   # eraser-sweep the visible page
@@ -61,7 +62,8 @@ Constraints that shaped this: the tablet ships no Python on firmware 3.28 (3.15 
 - `hershey.py` — single-stroke vector fonts from `host/fonts/*.jhf`, plus the layout engine both font kinds share. Bold is faked by re-tracing each path offset by a couple of px. `layout_runs` asks a font for a whole word if it offers `word()`, and otherwise steps glyph by glyph.
 - `skeleton.py` — the other way to get a pen path: rasterise an ordinary TTF, Zhang-Suen thin it to a one-pixel ridge, then walk that ridge as a graph into ordered polylines (prune the whiskers thinning leaves, stitch runs end to end so the pen lifts less). Reports metrics in the same 32-unit em box as Hershey, so the two are interchangeable above this layer. Words are rasterised whole, because in a joined hand the exit of one letter is the entry of the next. Needs `numpy`; the per-pixel form of the thinning is too slow in plain Python.
 - `style.py` — `Palette` picks the hand: >10 words gets the plain `futural`, shorter replies get the cursive accent; `*asterisks*` in the model output become emphasized accent runs. `load()` resolves a font name to whichever kind exists — a `.ttf` in `host/fonts` is skeletonised, anything else is Hershey.
-- `llm.py` — shells out to `claude -p ... --output-format json --allowedTools Read`, resuming one long-lived session whose id lives in `.riddle_session`. Each turn writes a *fresh* `captures/page-<ts>-<n>.png` filename so the resumed conversation cannot answer from a stale copy of the page.
+- `llm.py` — shells out to `claude -p ... --output-format json --allowedTools Read,WebSearch,WebFetch`, resuming one long-lived session whose id lives in `.riddle_session`. Each turn writes a *fresh* `captures/page-<ts>-<n>.png` filename so the resumed conversation cannot answer from a stale copy of the page. Search is in character: the persona tells it to look things up quietly, because a diary that has to check does not say so.
+- `recall.py` — the two kinds of remembering, kept apart on purpose. `Page` fingerprints the newest `.rm` file on the device; a different name means a new page or notebook, and a sharp drop in size means the page was wiped. Either ends the conversation. `Memory` is the other half: lines the model asked to keep, in `memories.txt`, fed back into the persona *only* when starting a fresh session, since a resumed one already has them.
 - `render.py` — strokes → cropped grayscale PNG for the model.
 - `draw.py` / `diagram.py` — polyline primitives and box-and-arrow layout. No fills exist; a solid area must be hatched the way you would shade it by hand.
 - `notebook.py` — resolves a notebook uuid by visible name over ssh. xochitl keeps the open document in memory and leaves `LastOpen` empty, so there is no way to know which page is actually on screen; the diary just announces its target at startup and never draws unprompted.
@@ -74,6 +76,12 @@ Constraints that shaped this: the tablet ships no Python on firmware 3.28 (3.15 
 - **Select the pen before drawing.** An injected stroke becomes whatever tool xochitl has active, so with the lasso selected a page of handwriting silently becomes a page of selections — it looks like a rendering bug and is not one. `riddle.py`, `testsheet.py`, `handwriting.py` and `picture.py` all call `device.select("pen")` first; anything new that draws must too. The taps live in `taps.json` and are re-recorded with `host/tools/learn_taps.py pen`.
 - Env knobs read at startup: `RM2_SSH_HOST`, `RIDDLE_NOTEBOOK`, `RIDDLE_PAUSE_MS`, `RIDDLE_INK_HEIGHT`, `RIDDLE_PRESSURE`, `RIDDLE_MODEL`, `RIDDLE_MAX_WORDS`, `RIDDLE_FONT_BODY`, `RIDDLE_FONT_ACCENT`. `RM2_WIFI_HOST` is read by `host/tools/link.py` only.
 - Skeletonised fonts fail differently from Hershey ones: thinning can break a stem that rasterised too light or too small, and the metrics will not show it. Look at `handwriting.py`'s PNG after changing font, weight or `RASTER_PX`.
+
+### Forgetting, and what survives it
+
+Turning to a new page, opening another notebook, or clearing the page ends the conversation: `Diary.forget()` drops the resumed session id so the next turn starts clean. What does *not* go is `memories.txt` — the model ends a reply with `REMEMBER: <one line>` when something should outlive the reset, and `llm.py` strips that line before it can reach the page.
+
+Two things constrain how well this works. xochitl only flushes a page when you navigate away from it, so a clear is noticed shortly after the fact rather than as it happens. And the diary's own answering — erase the page, write over it — looks exactly like the writer wiping it, which would make it forget after every sentence; `Session.answering` holds the watcher off and re-baselines instead.
 
 ### Wifi instead of the cable
 
