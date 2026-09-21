@@ -23,3 +23,6 @@ __pycache__/
 
 # macOS
 .DS_Store
+.riddle.pid
+riddle.log
+memories.txt
