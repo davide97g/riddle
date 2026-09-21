@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { InkWave, StatusLine } from '@/components/Status'
 import { useDiary } from '@/state/RiddleProvider'
-import { rowsInOrder } from '@/state/reducer'
+import { nowMs, rowsInOrder } from '@/state/reducer'
 import {
   ErrorRow,
   NoteRow,
@@ -15,6 +15,17 @@ import {
 
 const NEAR_BOTTOM = 80
 
+/** How long a `tool` row may go on claiming to be happening.
+ *
+ *  A motif that moves means "this is going on now", so it belongs to the
+ *  newest row and to nothing above it. But being newest is not quite enough:
+ *  nothing marks the end of a turn. The last thing the loop writes is
+ *  `writing`, and after the pen stops there is no row to overtake it until
+ *  somebody writes on the tablet again -- which may be an hour. So motion
+ *  also expires. Long enough that a real reply is still being inked when it
+ *  does, short enough that an idle page is still. */
+const LIVE_MS = 60_000
+
 export function Timeline() {
   const { state } = useDiary()
   const rows = rowsInOrder(state)
@@ -26,6 +37,24 @@ export function Timeline() {
   // last row is the one the eye is on anyway -- on a reload it marks where
   // the conversation had got to, which is worth a beat of motion.
   const newest = rows.at(-1)?.id
+
+  // The newest row, if it is a `tool` row, is the only one whose motif may
+  // move -- and only until it goes stale. Both clocks here are the session's,
+  // never the browser's: `nowMs` is what the server said plus how long ago
+  // it said it.
+  const last = rows.at(-1)
+  const going = last && last.kind !== 'pending' ? last.event : null
+  const toolRow = going?.kind === 'tool' ? going : null
+  const fresh = toolRow !== null && nowMs(state) - toolRow.t_ms < LIVE_MS
+  // Nothing else will re-render the page while it sits idle, so the moment
+  // the newest row goes stale has to be waited for on purpose.
+  const [, retick] = useState(0)
+  useEffect(() => {
+    if (!toolRow || !fresh) return
+    const left = LIVE_MS - (nowMs(state) - toolRow.t_ms)
+    const timer = window.setTimeout(() => retick((n) => n + 1), Math.max(0, left))
+    return () => window.clearTimeout(timer)
+  }, [toolRow, fresh, state])
 
   useEffect(() => {
     const el = box.current
@@ -70,7 +99,9 @@ export function Timeline() {
             case 'reply':
               return <ReplyRow key={row.id} event={event} fresh={now} />
             case 'tool':
-              return <ToolRow key={row.id} event={event} />
+              return (
+                <ToolRow key={row.id} event={event} live={row.id === newest && fresh} />
+              )
             case 'error':
               return <ErrorRow key={row.id} event={event} />
             default:

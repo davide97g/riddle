@@ -10,8 +10,19 @@
  *  and the keyframes are shared.
  */
 
-/** Thinking. Three dots of wet ink, bobbing in sequence. */
-export function InkDots({ className }: { className?: string }) {
+/** Thinking. Three dots of wet ink, bobbing in sequence.
+ *
+ *  `still` is for a row that has scrolled into the past. A motion that means
+ *  "this is happening" must stop meaning it the moment it stops being true,
+ *  or a timeline of finished turns reads as a dozen things all happening at
+ *  once. Held still, the dots rest where the animation rests. */
+export function InkDots({
+  className,
+  still = false,
+}: {
+  className?: string
+  still?: boolean
+}) {
   return (
     <svg viewBox="0 0 22 10" aria-hidden className={`h-2.5 w-[22px] ${className ?? ''}`}>
       {[3, 11, 19].map((cx, i) => (
@@ -21,8 +32,9 @@ export function InkDots({ className }: { className?: string }) {
           cy={6}
           r={2}
           fill="currentColor"
-          className="ink-dot"
-          style={{ animationDelay: `${i * 130}ms` }}
+          opacity={still ? 0.4 : undefined}
+          className={still ? undefined : 'ink-dot'}
+          style={still ? undefined : { animationDelay: `${i * 130}ms` }}
         />
       ))}
     </svg>
@@ -33,7 +45,13 @@ export function InkDots({ className }: { className?: string }) {
  *
  *  `back` runs it the other way, which is what erasing looks like -- the
  *  stroke retreating into the nib rather than coming out of it. */
-export function NibStroke({ back = false }: { back?: boolean }) {
+export function NibStroke({
+  back = false,
+  still = false,
+}: {
+  back?: boolean
+  still?: boolean
+}) {
   return (
     <svg viewBox="0 0 30 12" aria-hidden className="h-3 w-[30px] shrink-0">
       <path d="M0 10.5H30" stroke="currentColor" strokeOpacity={0.2} strokeWidth={1} />
@@ -44,7 +62,9 @@ export function NibStroke({ back = false }: { back?: boolean }) {
         stroke="currentColor"
         strokeWidth={1.75}
         strokeLinecap="round"
-        className={back ? 'nib-lift' : 'nib-lay'}
+        // Held still it keeps no dash offset at all, so what is left is the
+        // finished stroke rather than a nib frozen halfway across the line.
+        className={still ? undefined : back ? 'nib-lift' : 'nib-lay'}
       />
     </svg>
   )
@@ -77,14 +97,18 @@ export function StatusLine({
   children,
   motif,
   className = '',
+  live = true,
 }: {
   children: React.ReactNode
   motif: React.ReactNode
   className?: string
+  /** Whether this is still happening. A line about something that finished
+   *  three turns ago must not be announced, and must not move. */
+  live?: boolean
 }) {
   return (
     <p
-      aria-live="polite"
+      aria-live={live ? 'polite' : undefined}
       className={`row-in flex items-center gap-2 px-1 text-xs text-muted-foreground ${className}`}
     >
       <span className="flex w-[30px] shrink-0 justify-center">{motif}</span>

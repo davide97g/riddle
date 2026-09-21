@@ -252,15 +252,25 @@ export function ReplyRow({ event, fresh }: { event: DiaryEvent; fresh?: boolean 
  *  free to invent a verb and an unknown one should still look like work
  *  rather than like nothing: thinking is the fallback, and thinking is what
  *  anything unrecognised is doing. */
-function motifFor(doing: string) {
-  if (/eras|rubb|clear|wip/.test(doing)) return <NibStroke back />
-  if (/writ|draw|ink|sketch|answer/.test(doing)) return <NibStroke />
-  return <InkDots />
+function motifFor(doing: string, still: boolean) {
+  if (/eras|rubb|clear|wip/.test(doing)) return <NibStroke back still={still} />
+  if (/writ|draw|ink|sketch|answer/.test(doing)) return <NibStroke still={still} />
+  return <InkDots still={still} />
 }
 
-export function ToolRow({ event }: { event: DiaryEvent }) {
+/** What the diary is doing, or was.
+ *
+ *  Only the newest row is still happening: anything with a row under it has
+ *  been overtaken by whatever came next, however it ended. So the motion --
+ *  and the announcement -- belong to the last row alone, and the rest of the
+ *  timeline holds still. */
+export function ToolRow({ event, live = false }: { event: DiaryEvent; live?: boolean }) {
   const doing = String(event.meta.doing ?? event.text ?? 'thinking')
-  return <StatusLine motif={motifFor(doing)}>the diary is {doing}</StatusLine>
+  return (
+    <StatusLine motif={motifFor(doing, !live)} live={live}>
+      the diary is {doing}
+    </StatusLine>
+  )
 }
 
 export function ErrorRow({ event }: { event: DiaryEvent }) {
