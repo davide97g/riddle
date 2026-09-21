@@ -124,6 +124,13 @@ Server to client:
 Reconnecting is `hello {since: seq}` and nothing else. There is no other
 resync path and there does not need to be one.
 
+Events are pushed to every open socket at once, each with five seconds to
+take the frame. A page that stops reading is dropped rather than waited on:
+`drain()` has no deadline of its own, so one stalled socket would otherwise
+hold up the only coroutine that delivers events -- to everybody, silently,
+while the page still says it is connected. A dropped page reconnects and
+replays like any other.
+
 ### `/ws/audio?rate=16000&capture=<name>` — binary, inbound only
 
 Each frame is **4 bytes of little-endian sequence number, then 3200 signed

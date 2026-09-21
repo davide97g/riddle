@@ -20,6 +20,7 @@ from riddle import config
 from riddle.web import auth, wsock
 
 POLL_S = 0.25  # how often the store is tailed for anything new
+SEND_S = 5.0   # how long one page may take a frame before it is dropped
 
 INDEX_FALLBACK = b"""<!doctype html><meta charset=utf-8>
 <title>riddle</title><body style="font:16px system-ui;padding:3rem;max-width:34rem">
@@ -38,14 +39,34 @@ class Hub:
         self.seen = 0
 
     async def say(self, message: dict) -> None:
+        """One message to every open page, and no page can hold up another.
+
+        Sent to all of them at once rather than one after another, and each
+        one on a deadline. A socket whose peer has stopped reading does not
+        fail -- `drain()` waits for the window to open and there is no
+        timeout on it -- so a phone that went away mid-frame used to be able
+        to stall the whole fan-out, and with it the only thing that delivers
+        events. The page would sit there saying it was connected, and a
+        reload would fix it, because replay is a different coroutine.
+        """
+        import asyncio
+
         if not self.control:
             return
         body = json.dumps(message)
-        for sock in list(self.control):
-            if not sock.open:
+        live = [sock for sock in self.control if sock.open]
+        for gone in self.control - set(live):
+            self.control.discard(gone)
+        if not live:
+            return
+        done = await asyncio.gather(
+            *(asyncio.wait_for(sock.send(body), SEND_S) for sock in live),
+            return_exceptions=True,
+        )
+        for sock, outcome in zip(live, done):
+            if isinstance(outcome, BaseException):
                 self.control.discard(sock)
-                continue
-            await sock.send(body)
+                print(f"dropped a page: {outcome!r}", flush=True)
 
     async def tail(self) -> None:
         """Push anything new in the store out to every open page.
@@ -59,14 +80,16 @@ class Hub:
 
         while True:
             await asyncio.sleep(POLL_S)
+            # Everything, not only the read: this coroutine is the only thing
+            # that delivers events to an open page, and an exception escaping
+            # it ends live updates for everybody until the server is
+            # restarted -- silently, because nothing retrieves the task.
             try:
-                fresh = self.store.since_id(self.seen)
+                for event in self.store.since_id(self.seen):
+                    self.seen = event["id"]
+                    await self.say({"type": "event", **event})
             except Exception as exc:  # the loop may be mid-write, or gone
-                print(f"tail: {exc}", flush=True)
-                continue
-            for event in fresh:
-                self.seen = event["id"]
-                await self.say({"type": "event", **event})
+                print(f"tail: {exc!r}", flush=True)
 
 
 class Server:
