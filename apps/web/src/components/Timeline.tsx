@@ -8,6 +8,7 @@ import {
   PendingRow,
   PenStrokeRow,
   ReplyRow,
+  ShotRow,
   ToolRow,
   VoiceSegmentRow,
 } from '@/components/rows/Rows'
@@ -50,6 +51,8 @@ export function Timeline() {
           switch (event.kind) {
             case 'strokes':
               return <PenStrokeRow key={row.id} event={event} />
+            case 'shot':
+              return <ShotRow key={row.id} event={event} />
             case 'speech':
               return <VoiceSegmentRow key={row.id} event={event} />
             case 'note':

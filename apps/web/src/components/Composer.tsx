@@ -37,16 +37,18 @@ export function Composer() {
           }
           className="max-h-32 min-h-11 flex-1 resize-none"
         />
-        <Button onClick={send} disabled={offline} className="h-11">
+        <Button onClick={send} disabled={offline || !state.diary.present} className="h-11">
           Send
         </Button>
       </div>
       <div className="mx-auto mt-2 flex max-w-2xl flex-col items-center gap-1">
         <LevelMeter level={level} live={mic.state === 'recording'} />
         <p className="text-center text-xs text-muted-foreground">
-          {!state.listening
-            ? 'No speech model loaded, so the microphone is off.'
-            : 'Send asks the diary for an answer now. It always answers on the tablet.'}
+          {!state.diary.present
+            ? 'The diary is not running, so nothing would answer a send.'
+            : !state.listening
+              ? 'No speech model loaded, so the microphone is off.'
+              : 'Send asks the diary for an answer now. It always answers on the tablet.'}
         </p>
       </div>
     </div>

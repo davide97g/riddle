@@ -110,15 +110,7 @@ class Server:
             return _json(writer, {"ok": True, "session": self.store.session_id})
 
         if path == "/api/state":
-            return _json(
-                writer,
-                {
-                    "session": self.store.session_id,
-                    "now_ms": self.store.now_ms(),
-                    "started_ms": self.store.started_ms,
-                    "listening": self.ears is not None,
-                },
-            )
+            return _json(writer, self.state())
 
         if path == "/api/events":
             since = int(query.get("since", 0))
@@ -139,7 +131,13 @@ class Server:
             intent = self.store.push_intent(
                 "web", "send", {"at_ms": at_ms, "draft": payload.get("draft")}
             )
-            return _json(writer, {"intent": intent})
+            return _json(writer, {"intent": intent, "diary": self.diary()})
+
+        if path.startswith("/api/intent/"):
+            found = self.store.intent(int(path.rsplit("/", 1)[1] or 0))
+            if found is None:
+                return _json(writer, {"error": "no such intent"}, status="404 Not Found")
+            return _json(writer, found)
 
         if path.startswith("/api/"):
             return _json(writer, {"error": "no such route"}, status="404 Not Found")
@@ -190,17 +188,7 @@ class Server:
     async def control(self, sock: wsock.Socket) -> None:
         self.hub.control.add(sock)
         try:
-            await sock.send(
-                json.dumps(
-                    {
-                        "type": "hello.ok",
-                        "session": self.store.session_id,
-                        "started_ms": self.store.started_ms,
-                        "now_ms": self.store.now_ms(),
-                        "listening": self.ears is not None,
-                    }
-                )
-            )
+            await sock.send(json.dumps({"type": "hello.ok", **self.state()}))
             async for raw in sock:
                 if isinstance(raw, bytes):
                     continue  # the control socket is text; audio has its own
@@ -209,6 +197,24 @@ class Server:
             await sock.close(1003, "not json")
         finally:
             self.hub.control.discard(sock)
+
+    def diary(self) -> dict:
+        """Whether the half that owns the pen is running.
+
+        Without this the page promises that Send will be answered even when
+        nothing is listening, and the intent simply waits.
+        """
+        ago_ms = self.store.present("loop")
+        return {"present": ago_ms is not None, "ago_ms": ago_ms}
+
+    def state(self) -> dict:
+        return {
+            "session": self.store.session_id,
+            "now_ms": self.store.now_ms(),
+            "started_ms": self.store.started_ms,
+            "listening": self.ears is not None,
+            "diary": self.diary(),
+        }
 
     async def said(self, sock: wsock.Socket, msg: dict) -> None:
         kind = msg.get("type")
@@ -227,10 +233,15 @@ class Server:
             return
         if kind == "send":
             at_ms = int(msg.get("at_ms", self.store.now_ms()))
-            self.store.push_intent(
+            intent = self.store.push_intent(
                 "web", "send", {"at_ms": at_ms, "draft": msg.get("draft")}
             )
-            return
+            # The page holds an optimistic row until the answer lands. Give it
+            # the intent id so it can settle that row when the reply arrives,
+            # rather than trying to match on the text it sent.
+            return await sock.send(
+                json.dumps({"type": "intent.ok", "id": intent, "at_ms": at_ms})
+            )
         await sock.send(json.dumps({"type": "error", "message": f"unknown {kind!r}"}))
 
     async def audio(self, sock: wsock.Socket, query: dict) -> None:

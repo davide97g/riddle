@@ -19,9 +19,13 @@ from pathlib import Path
 class Memory:
     """The lines the diary chose to keep, in a file it is read back from."""
 
-    def __init__(self, path: Path, limit: int = 40) -> None:
+    def __init__(self, path: Path, limit: int = 40, on_keep=None) -> None:
         self.path = path
         self.limit = limit
+        # Called when a line is actually kept, so the loop can mirror it onto
+        # the timeline. The callback keeps the dependency pointing one way:
+        # this module knows nothing about the store.
+        self.on_keep = on_keep
 
     def lines(self) -> list[str]:
         if not self.path.exists():
@@ -47,4 +51,7 @@ class Memory:
         if any(line.endswith(note) for line in kept):
             return
         kept.append(stamped)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text("\n".join(kept[-self.limit :]) + "\n")
+        if self.on_keep is not None:
+            self.on_keep(note)

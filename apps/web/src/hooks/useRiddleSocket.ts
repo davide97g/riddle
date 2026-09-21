@@ -11,8 +11,19 @@ const PONG_DEADLINE = 10000
  *  Every persisted event carries a monotonic id, so reconnecting is
  *  `hello { since }` and the reducer's dedupe absorbs the overlap. There is no
  *  other resync path and there does not need to be one. */
-export function useRiddleSocket(dispatch: (action: Action) => void) {
+export function useRiddleSocket(
+  dispatch: (action: Action) => void,
+  /** called when the server acknowledges a send, with its intent id */
+  onIntent?: (id: number) => void,
+) {
   const ws = useRef<WebSocket | null>(null)
+  // Held in a ref so a new callback identity does not tear the socket down
+  // and redial it on every render, and written in an effect rather than
+  // during render, which is not a safe place to touch one.
+  const onIntentRef = useRef(onIntent)
+  useEffect(() => {
+    onIntentRef.current = onIntent
+  }, [onIntent])
   const seq = useRef(0)
   const attempt = useRef(0)
   const shut = useRef(false)
@@ -62,6 +73,10 @@ export function useRiddleSocket(dispatch: (action: Action) => void) {
           return
         }
         if (msg.type === 'hello.ok') lastPong = Date.now()
+        if (msg.type === 'intent.ok') {
+          onIntentRef.current?.(msg.id)
+          return
+        }
         if (msg.type === 'event') seq.current = Math.max(seq.current, msg.id)
         dispatch({ type: 'server', msg })
       }

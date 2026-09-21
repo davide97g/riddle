@@ -15,14 +15,13 @@ and the failure mode -- a cut in the wrong place -- is the same either way.
 """
 
 import asyncio
-import os
 import re
 import subprocess
 import sys
 import time
 import wave
 
-from riddle import paths
+from riddle import config
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,12 +50,15 @@ class Segment:
 
 def model_path() -> Path:
     """Where the speech model is. Relative paths hang off var/models."""
-    name = os.environ.get("RIDDLE_ASR_MODEL", "ggml-parakeet-tdt-0.6b-v3-q8_0.bin")
-    return paths.under_root(name, paths.MODELS)
+    from riddle import config
+
+    return config.get().asr_model
 
 
 def transcribe(clip: Path, timeout: int = 180) -> list[Segment]:
     """Run the model over one file. Blocking, and slow enough to matter."""
+    from riddle import config
+
     model = model_path()
     if not model.is_file():
         raise RuntimeError(f"no speech model at {model}")
@@ -67,7 +69,7 @@ def transcribe(clip: Path, timeout: int = 180) -> list[Segment]:
             "-m", str(model),
             "-f", str(clip),
             "-ps", "-np",
-            "-t", os.environ.get("RIDDLE_ASR_THREADS", "4"),
+            "-t", str(config.get().asr_threads),
         ],
         capture_output=True,
         text=True,
@@ -100,9 +102,10 @@ class Gate:
     """
 
     def __init__(self) -> None:
-        self.floor = float(os.environ.get("RIDDLE_VAD_FLOOR", "0.012"))
-        self.hang_ms = int(os.environ.get("RIDDLE_VAD_HANG_MS", "700"))
-        self.max_ms = int(os.environ.get("RIDDLE_VAD_MAX_MS", "20000"))
+        cfg = config.get()
+        self.floor = cfg.vad_floor
+        self.hang_ms = cfg.vad_hang_ms
+        self.max_ms = cfg.vad_max_ms
         self.history: list[float] = []
         self.loud = 0      # consecutive frames over the gate
         self.quiet_ms = 0
@@ -241,6 +244,10 @@ class Ears:
         # One at a time. Two parakeet processes share one Metal context and
         # make each other slower for no gain.
         self.one_at_a_time = asyncio.Semaphore(1)
+        # How many clips are with the model right now. The loop reads this to
+        # decide whether waiting another moment would catch a sentence that
+        # was spoken before the pause but has not been transcribed yet.
+        self.inflight = 0
 
     async def say(self, message: dict) -> None:
         if self.hub is not None:
@@ -253,6 +260,7 @@ class Ears:
         # There is no partial transcript to show, so the page is told that a
         # sentence is being read and holds a placeholder until it lands.
         await self.say({"type": "pending", "clip": clip.name, "on": True})
+        self._inflight(+1)
         try:
             async with self.one_at_a_time:
                 segments = await asyncio.to_thread(transcribe, clip)
@@ -276,7 +284,12 @@ class Ears:
             print(f"could not read {clip.name}: {exc}", file=sys.stderr)
             await self.say({"type": "error", "message": f"could not hear that: {exc}"})
         finally:
+            self._inflight(-1)
             await self.say({"type": "pending", "clip": clip.name, "on": False})
+
+    def _inflight(self, delta: int) -> None:
+        self.inflight = max(0, self.inflight + delta)
+        self.store.set_state("asr.inflight", self.inflight)
 
     def prune(self) -> None:
         """Drop old recordings.
@@ -285,7 +298,9 @@ class Ears:
         actually said, or re-run against a better model. They are also a
         recording of your room, so they do not stay forever.
         """
-        days = int(os.environ.get("RIDDLE_AUDIO_KEEP_DAYS", "7"))
+        from riddle import config
+
+        days = config.get().audio_keep_days
         if days <= 0 or not self.audio_dir.is_dir():
             return
         cutoff = time.time() - days * 86400

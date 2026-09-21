@@ -1,4 +1,4 @@
-import type { DiaryEvent, Row, ServerMessage } from '@/lib/protocol'
+import type { DiaryEvent, DiaryPresence, Row, ServerMessage } from '@/lib/protocol'
 
 export type Conn = 'connecting' | 'open' | 'closed'
 
@@ -10,7 +10,15 @@ export type State = {
   order: string[]
   session: number | null
   startedMs: number | null
+  /** the server's own t_ms when it greeted us, and the local clock reading at
+   *  that moment. A phone whose clock is a few seconds off the Mac's would
+   *  otherwise drop its own rows into the wrong place in a list sorted by
+   *  t_ms, so elapsed time is measured rather than assumed. */
+  serverNowMs: number | null
+  greetedAt: number | null
   listening: boolean
+  /** whether the half that owns the pen is running */
+  diary: DiaryPresence
   conn: Conn
   draft: string
   /** somebody is speaking right now */
@@ -25,7 +33,10 @@ export const initial: State = {
   order: [],
   session: null,
   startedMs: null,
+  serverNowMs: null,
+  greetedAt: null,
   listening: false,
+  diary: { present: false, ago_ms: null },
   conn: 'connecting',
   draft: '',
   hearing: false,
@@ -38,6 +49,7 @@ export type Action =
   | { type: 'draft'; text: string }
   | { type: 'pending'; id: string; text: string }
   | { type: 'failed'; id: string }
+  | { type: 'acked'; id: string; intent: number }
 
 /** Insert keeping `order` sorted by when the thing happened.
  *
@@ -60,13 +72,16 @@ function place(state: State, row: Row): State {
 function settle(state: State, event: DiaryEvent): State {
   // A note we sent optimistically comes back as a real row. Replace it in
   // place rather than appending, so nothing jumps under the reader's thumb.
+  //
+  // By intent id where there is one -- a send and the reply it causes share
+  // no text at all, so matching on the words could never have worked for
+  // anything but a plain note.
+  const intent = typeof event.meta.intent === 'number' ? event.meta.intent : null
   const pending = state.order.find((id) => {
     const row = state.rows.get(id)
-    return (
-      row?.kind === 'pending' &&
-      event.kind === 'note' &&
-      row.text === event.text
-    )
+    if (row?.kind !== 'pending') return false
+    if (intent !== null && row.intent === intent) return true
+    return event.kind === 'note' && row.text === event.text
   })
   let next = state
   if (pending) {
@@ -92,9 +107,14 @@ export function reduce(state: State, action: Action): State {
       return place(state, {
         kind: 'pending',
         id: action.id,
-        t_ms: state.startedMs ? Date.now() - state.startedMs : Date.now(),
+        t_ms: nowMs(state),
         text: action.text,
       })
+    case 'acked': {
+      const row = state.rows.get(action.id)
+      if (row?.kind !== 'pending') return state
+      return place(state, { ...row, intent: action.intent })
+    }
     case 'failed': {
       const row = state.rows.get(action.id)
       if (row?.kind !== 'pending') return state
@@ -108,7 +128,10 @@ export function reduce(state: State, action: Action): State {
           conn: 'open',
           session: msg.session,
           startedMs: msg.started_ms,
+          serverNowMs: msg.now_ms,
+          greetedAt: performance.now(),
           listening: msg.listening,
+          diary: msg.diary ?? state.diary,
         }
       }
       if (msg.type === 'hearing') {
@@ -134,6 +157,15 @@ export function reduce(state: State, action: Action): State {
     default:
       return state
   }
+}
+
+/** The session clock, as this page best knows it: what the server said when
+ *  it greeted us, plus how long ago that was by a clock that cannot step. */
+export function nowMs(state: State): number {
+  if (state.serverNowMs === null || state.greetedAt === null) {
+    return state.startedMs ? Date.now() - state.startedMs : 0
+  }
+  return state.serverNowMs + Math.round(performance.now() - state.greetedAt)
 }
 
 export function rowsInOrder(state: State): Row[] {

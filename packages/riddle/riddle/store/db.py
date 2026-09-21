@@ -1,11 +1,14 @@
-"""The diary's memory: one sqlite file, written by three processes.
+"""The diary's memory: one sqlite file, written by both halves.
 
-The loop, the web server and the MCP server all write here, so there is one
-rule that keeps them out of each other's way: **no write transaction is held
+The loop and the voice server both write here, so there is one rule that
+keeps them out of each other's way: **no write transaction is held
 across a subprocess call, a network wait or a sleep**. Every write below is a
 single statement, or a handful inside `_tx()` that touch nothing but the
 database. With WAL and a five second busy timeout, that is enough; readers
-never block and the write lock is held for microseconds.
+never block and the write lock is held for microseconds. The corollary is
+just as load bearing: **a connection belongs to one thread**. Python's
+sqlite3 enforces it, so anything that does slow work off-thread posts its
+result back and lets the owning thread write.
 
 Time is the other shared thing. `t_ms` is milliseconds since the session row
 was written, which any process can compute for itself once it knows
@@ -22,6 +25,28 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from riddle.paths import SCHEMA
+
+# Anything that can be on the timeline. Checked in Python rather than as a
+# column constraint, because adding one to an existing table means rebuilding
+# it, and the value here is catching a typo at the call site.
+KINDS = ("strokes", "speech", "shot", "reply", "note", "tool", "error")
+
+# A session nobody has beaten in this long is over, whatever ended_ms says:
+# a process that was killed outright never got to write it.
+STALE_MS = 60_000
+
+# The schema is applied with CREATE ... IF NOT EXISTS, which means a new
+# column in schema.sql does nothing at all to a database that already exists
+# -- the first query against it simply raises "no such column". So each
+# change is also a migration, applied in order and remembered in
+# PRAGMA user_version.
+MIGRATIONS = (
+    # 1: both halves may now start a session, so each beats its own clock.
+    ("ALTER TABLE sessions ADD COLUMN loop_ms INTEGER",
+     "ALTER TABLE sessions ADD COLUMN voice_ms INTEGER"),
+    # 2: made_ms is session-relative, so an intent has to say which session.
+    ("ALTER TABLE intents ADD COLUMN session_id INTEGER REFERENCES sessions(id)",),
+)
 
 # The panel is 1404x1872 and Device._resample already spaces points three
 # pixels apart, so rounding to whole pixels throws away nothing a pen could
@@ -50,10 +75,11 @@ class Store:
         self.conn = conn
         self.session_id = session_id
         self.started_ms = started_ms
+        self.role = "reader"
 
     @classmethod
     def open(cls, path: Path, note: str | None = None) -> "Store":
-        """Open the store and start a session."""
+        """Open the store and start a session of its own."""
         conn = _connect(path)
         started_ms = int(time.time() * 1000)
         row = conn.execute(
@@ -63,20 +89,74 @@ class Store:
         return cls(conn, row["id"], started_ms)
 
     @classmethod
-    def attach(cls, path: Path) -> "Store":
-        """Open the store and join the session already running.
+    def join(cls, path: Path, role: str) -> "Store":
+        """Join the session in progress, or start one. Never refuses.
 
-        The web server and the MCP server do this: they record into whatever
-        session the loop started, and refuse to invent one of their own, because
-        a second session would give every timestamp a different origin.
+        Strict ownership -- the loop creates, everyone else attaches -- fails
+        in the case that actually happens: the page is meant to be usable
+        before the tablet is connected. So whoever arrives first writes the
+        session row and the second one joins it, and the shared clock is
+        preserved either way round.
         """
         conn = _connect(path)
+        cutoff = int(time.time() * 1000) - STALE_MS
         row = conn.execute(
-            "SELECT id, started_ms FROM sessions ORDER BY id DESC LIMIT 1"
+            "SELECT id, started_ms FROM sessions WHERE ended_ms IS NULL"
+            " AND max(coalesce(loop_ms, 0), coalesce(voice_ms, 0)) > ?"
+            " ORDER BY id DESC LIMIT 1",
+            (cutoff,),
         ).fetchone()
         if row is None:
-            raise RuntimeError(f"no session in {path}: start the diary first")
+            started_ms = int(time.time() * 1000)
+            row = conn.execute(
+                "INSERT INTO sessions (started_ms, note) VALUES (?, ?)"
+                " RETURNING id, started_ms",
+                (started_ms, role),
+            ).fetchone()
+        store = cls(conn, row["id"], row["started_ms"])
+        store.role = role
+        store.beat()
+        return store
+
+    @classmethod
+    def attach(cls, path: Path) -> "Store | None":
+        """Join a live session read-only, or None if nothing is running.
+
+        None rather than an exception: a library cannot know whether "nobody
+        is running" is fatal for its caller, and guessing that it was is what
+        used to make the voice server give up and start a rival session.
+        """
+        conn = _connect(path)
+        cutoff = int(time.time() * 1000) - STALE_MS
+        row = conn.execute(
+            "SELECT id, started_ms FROM sessions WHERE ended_ms IS NULL"
+            " AND max(coalesce(loop_ms, 0), coalesce(voice_ms, 0)) > ?"
+            " ORDER BY id DESC LIMIT 1",
+            (cutoff,),
+        ).fetchone()
+        if row is None:
+            conn.close()
+            return None
         return cls(conn, row["id"], row["started_ms"])
+
+    def beat(self) -> None:
+        """Say this half is still here. One statement, called every few seconds."""
+        column = "loop_ms" if self.role == "loop" else "voice_ms"
+        self.conn.execute(
+            f"UPDATE sessions SET {column} = ? WHERE id = ?",
+            (int(time.time() * 1000), self.session_id),
+        )
+
+    def present(self, role: str) -> int | None:
+        """How long ago the other half last said it was there, in ms."""
+        column = "loop_ms" if role == "loop" else "voice_ms"
+        row = self.conn.execute(
+            f"SELECT {column} AS beat FROM sessions WHERE id = ?", (self.session_id,)
+        ).fetchone()
+        if row is None or row["beat"] is None:
+            return None
+        ago_ms = int(time.time() * 1000) - row["beat"]
+        return ago_ms if ago_ms < STALE_MS else None
 
     def now_ms(self) -> int:
         return int(time.time() * 1000) - self.started_ms
@@ -111,6 +191,8 @@ class Store:
         path: str | None = None,
         meta: dict | None = None,
     ) -> int:
+        if kind not in KINDS:
+            raise ValueError(f"unknown event kind {kind!r}")
         t_ms = self.now_ms() if t_ms is None else t_ms
         row = self.conn.execute(
             "INSERT INTO events (session_id, kind, t_ms, dur_ms, wall_ms, turn, text, path, meta)"
@@ -135,6 +217,7 @@ class Store:
         times: list[tuple[int, int]],
         *,
         turn: int | None = None,
+        path: str | None = None,
         meta: dict | None = None,
     ) -> int:
         """Record a batch of strokes as one timeline event plus its geometry.
@@ -149,7 +232,12 @@ class Store:
         meta.setdefault("strokes", len(strokes))
         with self._tx():
             event_id = self.add_event(
-                "strokes", t_ms=t0, dur_ms=times[-1][1] - t0, turn=turn, meta=meta
+                "strokes",
+                t_ms=t0,
+                dur_ms=times[-1][1] - t0,
+                turn=turn,
+                path=path,
+                meta=meta,
             )
             self.conn.executemany(
                 "INSERT INTO strokes (event_id, seq, t_ms, points) VALUES (?, ?, ?, ?)",
@@ -198,9 +286,13 @@ class Store:
         slice of time, and anything recorded after that slice is the next
         turn's business whoever wrote it.
 
-        The window is half open, `from_ms` exclusive, so consecutive turns
-        cannot both claim the same event. The first turn of a session
-        therefore starts from -1, not 0.
+        The window is half open, `from_ms` exclusive, and the first turn of a
+        session starts from -1 rather than 0. But what really prevents two
+        turns claiming one event is `turn IS NULL`, not the window -- which
+        matters, because a transcript is stamped with when it was *spoken* and
+        can be written some seconds later, after the window it belongs to has
+        closed. The caller is therefore free to reach further back than the
+        previous turn ended, and does.
         """
         marks = ",".join("?" * len(kinds))
         done = self.conn.execute(
@@ -260,22 +352,34 @@ class Store:
 
     def push_intent(self, source: str, action: str, args: dict | None = None) -> int:
         row = self.conn.execute(
-            "INSERT INTO intents (made_ms, source, action, args) VALUES (?, ?, ?, ?)"
-            " RETURNING id",
-            (self.now_ms(), source, action, json.dumps(args or {})),
+            "INSERT INTO intents (session_id, made_ms, source, action, args)"
+            " VALUES (?, ?, ?, ?, ?) RETURNING id",
+            (self.session_id, self.now_ms(), source, action, json.dumps(args or {})),
         ).fetchone()
         return row["id"]
 
+    def intent_waiting(self) -> bool:
+        """Is there anything to do? A cheap indexed read, run several times a
+        second, so that the common case of an empty queue never takes the
+        write lock the voice server is using to record speech."""
+        row = self.conn.execute(
+            "SELECT 1 FROM intents WHERE state = 'pending' AND session_id = ? LIMIT 1",
+            (self.session_id,),
+        ).fetchone()
+        return row is not None
+
     def claim_intent(self) -> dict | None:
-        """Take the oldest pending intent, atomically.
+        """Take the oldest pending intent of this session, atomically.
 
         One UPDATE rather than a SELECT then an UPDATE, so two processes
         draining the queue can never hand out the same row.
         """
         row = self.conn.execute(
             "UPDATE intents SET state = 'running' WHERE id = ("
-            "  SELECT id FROM intents WHERE state = 'pending' ORDER BY id LIMIT 1"
-            ") RETURNING id, source, action, args"
+            "  SELECT id FROM intents WHERE state = 'pending' AND session_id = ?"
+            "  ORDER BY id LIMIT 1"
+            ") RETURNING id, source, action, args, made_ms",
+            (self.session_id,),
         ).fetchone()
         if row is None:
             return None
@@ -284,13 +388,52 @@ class Store:
             "source": row["source"],
             "action": row["action"],
             "args": json.loads(row["args"]),
+            "made_ms": row["made_ms"],
         }
+
+    def abandon_intents(self, reason: str) -> int:
+        """Fail anything left `running`. Only the loop ever sets that state,
+        so at its startup a running row can only be one it died holding."""
+        done = self.conn.execute(
+            "UPDATE intents SET state = 'failed', result = ?, done_ms = ?"
+            " WHERE state = 'running'",
+            (json.dumps({"error": reason}), self.now_ms()),
+        )
+        return done.rowcount
+
+    def expire_intents(self, older_than_ms: int, reason: str) -> list[int]:
+        """Discard pending intents nobody served in time.
+
+        A send pressed forty minutes ago, while the tablet was unplugged, must
+        not fire the moment it connects.
+        """
+        rows = self.conn.execute(
+            "UPDATE intents SET state = 'failed', result = ?, done_ms = ?"
+            " WHERE state = 'pending' AND made_ms < ? RETURNING id",
+            (json.dumps({"error": reason}), self.now_ms(), older_than_ms),
+        ).fetchall()
+        return [row["id"] for row in rows]
 
     def finish_intent(self, intent_id: int, *, ok: bool = True, result=None) -> None:
         self.conn.execute(
             "UPDATE intents SET state = ?, result = ?, done_ms = ? WHERE id = ?",
             ("done" if ok else "failed", json.dumps(result), self.now_ms(), intent_id),
         )
+
+    # --- small shared facts ----------------------------------------------
+
+    def set_state(self, key: str, value) -> None:
+        self.conn.execute(
+            "INSERT INTO state (key, value, at_ms) VALUES (?, ?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = excluded.value, at_ms = excluded.at_ms",
+            (key, json.dumps(value), self.now_ms()),
+        )
+
+    def get_state(self, key: str, default=None):
+        row = self.conn.execute(
+            "SELECT value FROM state WHERE key = ?", (key,)
+        ).fetchone()
+        return json.loads(row["value"]) if row else default
 
     def intent(self, intent_id: int) -> dict | None:
         row = self.conn.execute(
@@ -314,9 +457,32 @@ def _connect(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA.read_text())
-    if fresh:
-        conn.execute("PRAGMA journal_mode = WAL")
+    _migrate(conn, fresh)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection, fresh: bool) -> None:
+    """Bring an older database up to the schema it was just handed.
+
+    executescript only creates what is missing, so a column added to an
+    existing table needs saying twice: once in schema.sql for a new database
+    and once here for one that already exists. A fresh file is stamped as
+    current without running anything.
+    """
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if fresh:
+        conn.execute(f"PRAGMA user_version = {len(MIGRATIONS)}")
+        return
+    for step, statements in enumerate(MIGRATIONS[version:], start=version + 1):
+        for statement in statements:
+            try:
+                conn.execute(statement)
+            except sqlite3.OperationalError as exc:
+                # A column the schema already created on a database that was
+                # made between two versions. Nothing to do.
+                if "duplicate column name" not in str(exc):
+                    raise
+        conn.execute(f"PRAGMA user_version = {step}")
 
 
 def _event(row: sqlite3.Row) -> dict:

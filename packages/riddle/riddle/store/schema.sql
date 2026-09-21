@@ -11,12 +11,20 @@ PRAGMA synchronous  = NORMAL;
 PRAGMA busy_timeout = 5000;
 PRAGMA foreign_keys = ON;
 
--- One row per run of the diary. Everything else is relative to started_ms.
+-- One run of the diary, shared by both halves. Whoever starts first writes
+-- the row and the other joins it, because the invariant that matters is one
+-- origin for t_ms, not which process owns the session.
+--
+-- Liveness is the heartbeat, not ended_ms: a process killed outright never
+-- gets to set ended_ms, and a session nobody has beaten in a minute is over
+-- whatever the row says.
 CREATE TABLE IF NOT EXISTS sessions (
   id          INTEGER PRIMARY KEY,
   started_ms  INTEGER NOT NULL,          -- unix epoch ms
   ended_ms    INTEGER,
-  note        TEXT
+  note        TEXT,
+  loop_ms     INTEGER,                   -- unix epoch ms of the loop's last beat
+  voice_ms    INTEGER                    -- and the voice server's
 );
 
 -- The timeline. One shape for every kind of thing that happened, so the
@@ -70,7 +78,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS turns_by_n ON turns(session_id, n);
 -- The only way another process asks the diary to do something. The loop owns
 -- the device pipe; everyone else leaves a note here and waits for it.
 CREATE TABLE IF NOT EXISTS intents (
-  id       INTEGER PRIMARY KEY,
+  id          INTEGER PRIMARY KEY,
+  session_id  INTEGER REFERENCES sessions(id),
   made_ms  INTEGER NOT NULL,
   source   TEXT    NOT NULL,             -- web|mcp|tool
   action   TEXT    NOT NULL,             -- send|draw|erase|shot|forget
@@ -96,3 +105,23 @@ CREATE TRIGGER IF NOT EXISTS speech_fts_del AFTER DELETE ON events
   WHEN old.kind IN ('speech', 'note', 'reply') AND old.text IS NOT NULL BEGIN
     INSERT INTO speech_fts(speech_fts, rowid, text) VALUES ('delete', old.id, old.text);
   END;
+
+-- OF text, not a bare AFTER UPDATE. Claiming a turn writes events.turn on
+-- every speech row it takes, and a trigger that did not name its column would
+-- rebuild the index entry each time for no reason.
+CREATE TRIGGER IF NOT EXISTS speech_fts_upd AFTER UPDATE OF text ON events
+  WHEN old.kind IN ('speech', 'note', 'reply') BEGIN
+    INSERT INTO speech_fts(speech_fts, rowid, text) VALUES ('delete', old.id, old.text);
+    INSERT INTO speech_fts(rowid, text)
+      SELECT new.id, new.text WHERE new.text IS NOT NULL
+        AND new.kind IN ('speech', 'note', 'reply');
+  END;
+
+-- Small shared facts neither half owns: whether a clip is with the speech
+-- model right now, when the last one was cut. The loop reads these to know
+-- whether waiting a moment longer would catch a sentence still in flight.
+CREATE TABLE IF NOT EXISTS state (
+  key    TEXT PRIMARY KEY,
+  value  TEXT NOT NULL,
+  at_ms  INTEGER NOT NULL
+);

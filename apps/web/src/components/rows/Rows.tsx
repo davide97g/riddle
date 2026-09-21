@@ -49,7 +49,7 @@ function Row({
 
 export function PenStrokeRow({ event }: { event: DiaryEvent }) {
   const strokes = Number(event.meta.strokes ?? 0)
-  const path = typeof event.meta.path === 'string' ? event.meta.path : null
+  const path = event.path
   return (
     <Row at={event.wall_ms} label="written">
       <p className="text-sm text-muted-foreground">
@@ -68,6 +68,22 @@ export function PenStrokeRow({ event }: { event: DiaryEvent }) {
   )
 }
 
+export function ShotRow({ event }: { event: DiaryEvent }) {
+  const path = event.path
+  return (
+    <Row at={event.wall_ms} label="the screen">
+      {path && (
+        <img
+          src={`/api/captures/${path.replace(/^captures\//, '')}`}
+          alt="the tablet's screen"
+          className="mt-1 max-h-72 w-full rounded-md border object-contain"
+          loading="lazy"
+        />
+      )}
+    </Row>
+  )
+}
+
 export function VoiceSegmentRow({ event }: { event: DiaryEvent }) {
   return (
     <Row at={event.wall_ms} label="said">
@@ -77,8 +93,10 @@ export function VoiceSegmentRow({ event }: { event: DiaryEvent }) {
 }
 
 export function NoteRow({ event }: { event: DiaryEvent }) {
+  // A note the diary wrote to itself, rather than one you typed.
+  const remembered = event.meta.remember === true
   return (
-    <Row at={event.wall_ms} label="typed">
+    <Row at={event.wall_ms} label={remembered ? 'kept' : 'typed'}>
       <p className="text-sm leading-relaxed">{event.text}</p>
     </Row>
   )

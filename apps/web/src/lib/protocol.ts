@@ -25,6 +25,10 @@ export type DiaryEvent = {
   meta: Record<string, unknown>
 }
 
+/** Whether the half that owns the pen is running. Without it the page
+ *  promises an answer that nothing is there to give. */
+export type DiaryPresence = { present: boolean; ago_ms: number | null }
+
 export type ServerMessage =
   | ({ type: 'event' } & DiaryEvent)
   | {
@@ -33,7 +37,11 @@ export type ServerMessage =
       started_ms: number
       now_ms: number
       listening: boolean
+      diary: DiaryPresence
     }
+  /** a send was recorded, and this is its id. the reply carries the same id
+   *  in meta.intent, which is how an optimistic row settles */
+  | { type: 'intent.ok'; id: number; at_ms: number }
   | { type: 'pong'; t: number }
   /** the gate opened or closed: somebody is speaking, or has stopped */
   | { type: 'hearing'; on: boolean }
@@ -52,4 +60,12 @@ export type ClientMessage =
  *  said but not yet seen come back. */
 export type Row =
   | { kind: 'event'; id: string; t_ms: number; event: DiaryEvent }
-  | { kind: 'pending'; id: string; t_ms: number; text: string; failed?: boolean }
+  | {
+      kind: 'pending'
+      id: string
+      t_ms: number
+      text: string
+      failed?: boolean
+      /** set once the server has acknowledged the send */
+      intent?: number
+    }
