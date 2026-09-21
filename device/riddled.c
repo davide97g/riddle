@@ -1,8 +1,8 @@
 // riddled - reMarkable 2 side agent for the Tom Riddle diary.
 //
-// The tablet's own python is stripped down to the point of being useless (no
-// ctypes, socket, fcntl or mmap), and rm2fb cannot be used because firmware
-// 3.15 moved xochitl to Qt6 while the prebuilt shim is still Qt5. So this
+// The tablet ships no python at all on firmware 3.28 (and on 3.15 before it,
+// a build stripped of ctypes, socket, fcntl and mmap), and rm2fb cannot be
+// used because xochitl is Qt6 while the prebuilt shim is Qt5. So this
 // agent talks to the digitizer directly and is driven over an ssh pipe by the
 // host: pen samples go out on stdout, drawing commands come in on stdin.
 //

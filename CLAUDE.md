@@ -20,7 +20,24 @@ A "Tom Riddle diary" for a reMarkable 2 tablet. You handwrite on a page, pause, 
 
 No test suite, no linter, no package manifest. The venv holds only Pillow. Dependencies outside it: `zig` (cross-compiler), `ssh`/`scp`, and the `claude` CLI on PATH.
 
-Device access is via the ssh alias `rm2` (`~/.ssh/config` → 10.11.99.1 over USB, root). `.env` holds the tablet password and tuning knobs and is gitignored; the reMarkable regenerates the password on major firmware updates.
+Device access is via the ssh alias `rm2` (`~/.ssh/config` → 10.11.99.1 over USB, root), authenticating with `~/.ssh/id_ed25519_remarkable`. `.env` holds the tablet password and tuning knobs and is gitignored; nothing in the code actually reads `RM2_PASSWORD`, it is there for manual logins. Major firmware updates regenerate both that password **and the SSH host key** — a changed host key after an update is expected, but verify the new fingerprint on the tablet (Settings → Help → Copyrights and licenses) before clearing the old one with `ssh-keygen -R 10.11.99.1`.
+
+### Device state (verified 2026-09-21)
+
+| | |
+|---|---|
+| Firmware | `3.28.0.172` (`/etc/version` `20260827113527`), upgraded from `3.15.4.2` |
+| OS | Codex Linux 5.8.203 (scarthgap) |
+| Kernel | `5.4.70-v1.6.3-rm11x`, armv7l |
+| xochitl | Qt 6.10.3 — so the Qt5 `rm2fb` shim still fails to load |
+| Python on device | **none** — `/usr/bin/python*` does not exist |
+| Pen node | `/dev/input/event1`, `Wacom I2C Digitizer` (unchanged) |
+| Digitizer range | X 0–20966, Y 0–15725, pressure 0–4095 — matches `geometry.py` |
+| `riddled` | still runs on this firmware; `PING` → `PONG` verified |
+
+The 3.28 update **wiped the document store**: `/home/root/.local/share/remarkable/xochitl` holds no `.metadata` files, so `notebook.find()` resolves nothing until a notebook is recreated. That directory now also carries a binary `.tree` sync index, which `notebook.py` ignores — it still globs `*.metadata`, which is fine, but the index is where 3.28 keeps its own view. `LastOpen` in `xochitl.conf` is still empty, so the "announce the target, never draw unprompted" rule stands.
+
+Injection tuning has **not** been re-validated against xochitl 3.28; re-run `host/tools/testsheet.py --yes` before trusting the old `pressure`/`step_ms`/`spacing` values.
 
 ## Architecture
 
@@ -32,7 +49,7 @@ Two halves talking over one ssh pipe. Nothing listens on a port.
 
 Injection works because `write()` to an evdev node is replayed through the input core, so xochitl sees synthetic strokes as real pen input. The catch: those events also come back to *us* as reads. `echo_push`/`echo_take` keep a ring of exactly what we wrote and cancel it against the inbound stream, with a short forward scan because the input core drops unchanged ABS values. This is what lets someone keep writing while the diary is drawing.
 
-Constraints that shaped this: the tablet's Python has no ctypes/socket/fcntl/mmap, and rm2fb does not work on firmware 3.15 (Qt6 xochitl vs. a Qt5 shim). Hence C, static musl, evdev only.
+Constraints that shaped this: the tablet ships no Python on firmware 3.28 (3.15 had one without ctypes/socket/fcntl/mmap), and rm2fb does not work (Qt6 xochitl vs. a Qt5 shim). Hence C, static musl, evdev only.
 
 **`host/`** — Python, no package, modules import each other flat (`sys.path` hack in `host/tools/*`).
 

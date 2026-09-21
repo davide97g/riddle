@@ -41,10 +41,11 @@ just draw hollow letters.
 
 A few decisions that look odd until you know why:
 
-- **C, not Python, on the device.** The tablet's Python ships without ctypes,
-  socket, fcntl or mmap, so it cannot touch an input device at all.
-- **evdev, not the framebuffer.** `rm2fb` does not work on firmware 3.15, where
-  xochitl is Qt6 and the shim is Qt5.
+- **C, not Python, on the device.** Firmware 3.28 ships no Python at all; 3.15
+  shipped one built without ctypes, socket, fcntl or mmap. Either way it cannot
+  touch an input device.
+- **evdev, not the framebuffer.** `rm2fb` does not work: xochitl is Qt6
+  (6.10.3 on firmware 3.28) and the prebuilt shim is still Qt5.
 - **The pause is measured from a pen lift, not from silence.** A nib resting on
   the page emits nothing, because the input core drops repeated coordinates.
 - **Erasing and thinking happen at the same time**, so your ink starts fading
@@ -68,7 +69,10 @@ a Python with Pillow.
 
    The root password is printed on the tablet under *Settings → Help →
    Copyrights and licenses*. Copying a key over with `ssh-copy-id` saves typing
-   it every time. Note that major firmware updates regenerate it.
+   it every time. Note that major firmware updates regenerate it, along with
+   the device's SSH host key — after an update `ssh` will refuse to connect
+   until you check the new fingerprint on that same screen and then run
+   `ssh-keygen -R 10.11.99.1`.
 3. `cp .env.example .env` and fill it in.
 4. `python3 -m venv .venv && ./.venv/bin/pip install pillow`
 5. `./device/build.sh` — cross-compiles the agent and drops it on the tablet.
