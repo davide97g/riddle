@@ -106,7 +106,9 @@ def elsewhere(service: Service) -> int | None:
         return None
     try:
         done = subprocess.run(
-            ["pgrep", "-f", f"-m {service.module}"],
+            # `--`, because the pattern starts with a dash and pgrep would
+            # otherwise read `-m` as one of its own flags and match nothing.
+            ["pgrep", "-f", "--", f"-m {service.module}"],
             capture_output=True, text=True, timeout=5,
         )
     except (OSError, subprocess.SubprocessError):
