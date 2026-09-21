@@ -17,12 +17,52 @@ import notebook
 import render
 from geometry import SCREEN_H, SCREEN_W
 import recall
-from device import Device, PenUp, Sample
+from device import Device, PenUp, Sample, Tool, Touch
 from llm import Diary
 from style import Palette
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE_MARGIN = 70
+
+# What counts as writing, and what is only handling the tablet. Every one of
+# these arrives as pen input and none of them is a question: pressing a tool in
+# the toolbar, poking the page awake, rubbing something out, leaving a blot.
+TOOLBAR_X = 110       # screen px: a stroke wholly inside the left strip is UI
+TAP_TRAVEL = 25       # px of travel below which a stroke is a press, not a mark
+MIN_INK = 500         # px of travel before the page holds anything to answer
+MIN_SPAN = 110        # px of bounding box: a word is wider than a dot
+ERASE_RADIUS = 28     # px: an eraser pass this close takes the stroke with it
+
+
+def travel(stroke: list[tuple[float, float]]) -> float:
+    """How far the nib actually moved along a stroke."""
+    return sum(
+        ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+        for a, b in zip(stroke, stroke[1:])
+    )
+
+
+def crosses(stroke, pass_, radius: float) -> bool:
+    """Whether an eraser pass went over a stroke."""
+    sx = [x for x, _ in stroke]
+    sy = [y for _, y in stroke]
+    px = [x for x, _ in pass_]
+    py = [y for _, y in pass_]
+    if (
+        min(sx) - radius > max(px)
+        or max(sx) + radius < min(px)
+        or min(sy) - radius > max(py)
+        or max(sy) + radius < min(py)
+    ):
+        return False
+    # Both sides are sampled far finer than the radius, so stepping over them
+    # keeps this cheap without letting a pass slip between two points.
+    near = radius * radius
+    for ex, ey in pass_[::3]:
+        for x, y in stroke[::3]:
+            if (x - ex) ** 2 + (y - ey) ** 2 <= near:
+                return True
+    return False
 
 
 def env(name: str, default: str) -> str:
@@ -53,6 +93,9 @@ class Session:
         # drops repeated coordinates. Silence therefore only counts as a pause
         # once the pen has actually been lifted.
         self.pen_down = False
+        # Which end of the pen is on the page. The nib and the eraser both come
+        # through as strokes; only the tool says which one was meant.
+        self.tool = "pen"
         self.turn = 0
         # Set while the diary is erasing and writing, so the page watcher does
         # not mistake the diary's own work for the writer clearing the page.
@@ -105,16 +148,59 @@ class Session:
                 self.pen_down = True
                 self.last_input = time.monotonic()
             elif isinstance(event, PenUp):
-                if self.current:
-                    self.strokes.append(self.current)
-                    self.current = []
+                self.finish_stroke()
                 self.pen_down = False
+                self.last_input = time.monotonic()
+            elif isinstance(event, Tool):
+                self.tool = event.name
+            elif isinstance(event, Touch):
+                # A finger on the screen is handling the tablet, not writing:
+                # it never makes a question, but it does hold the answer off
+                # while a page is being scrolled or a tool picked.
                 self.last_input = time.monotonic()
 
             idle = time.monotonic() - self.last_input
-            if self.strokes and not self.pen_down and idle >= self.pause_s:
+            if not self.pen_down and idle >= self.pause_s and self.question():
                 print(f"paused {idle:.1f}s", file=sys.stderr)
                 self.answer()
+
+    def finish_stroke(self) -> None:
+        """File the stroke that just ended, unless it was not writing."""
+        stroke, self.current = self.current, []
+        if not stroke:
+            return
+        if self.tool == "rubber":
+            self.rub_out(stroke)
+            return
+        if travel(stroke) < TAP_TRAVEL:
+            return  # a press: a tool in the toolbar, the page woken, a blot
+        if max(x for x, _ in stroke) < TOOLBAR_X:
+            return  # a drag inside the toolbar strip, e.g. a thickness slider
+        self.strokes.append(stroke)
+
+    def rub_out(self, pass_: list[tuple[float, float]]) -> None:
+        """Take the pending strokes the eraser just went over off the page."""
+        kept = [s for s in self.strokes if not crosses(s, pass_, ERASE_RADIUS)]
+        if len(kept) != len(self.strokes):
+            print(
+                f"erased {len(self.strokes) - len(kept)} stroke(s)", file=sys.stderr
+            )
+        self.strokes = kept
+
+    def question(self) -> bool:
+        """Whether what is on the page is enough to be worth answering.
+
+        A pause only means something after something was written. Three seconds
+        of quiet with a dot or two on the page is quiet, not a question.
+        """
+        if not self.strokes:
+            return False
+        if sum(travel(s) for s in self.strokes) < MIN_INK:
+            return False
+        box = render.bounding_box(self.strokes)
+        if not box:
+            return False
+        return max(box[2] - box[0], box[3] - box[1]) >= MIN_SPAN
 
     def answer(self) -> None:
         self.answering.set()
@@ -202,6 +288,11 @@ class Session:
         in the queue: the agent cancels only its own echo, so those strokes
         survive and become the next question.
         """
+        # The diary just drove the tool back and forth to erase and write. If
+        # one of those switches escaped echo cancellation the host would think
+        # the writer is holding the eraser; assume the nib until the pen says
+        # otherwise, which it does the moment it comes near the page.
+        self.tool = "pen"
         self.last_input = time.monotonic()
 
 

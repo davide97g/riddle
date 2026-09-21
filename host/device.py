@@ -52,6 +52,13 @@ class Touch:
     y: int
 
 
+@dataclass
+class Tool:
+    """Which end of the pen is over the page: "pen" or "rubber"."""
+
+    name: str
+
+
 class PenUp:
     """Marker pushed onto the event queue when the nib leaves the page."""
 
@@ -93,6 +100,8 @@ class Device:
                 self.events.put(Sample(t_ms, x, y, pressure))
             elif parts[0] == "U":
                 self.events.put(PenUp(int(parts[1])))
+            elif parts[0] == "K" and len(parts) == 2:
+                self.events.put(Tool(parts[1].lower()))
             elif parts[0] == "T" and len(parts) == 3:
                 self.events.put(Touch(int(parts[1]), int(parts[2])))
             elif parts[0] == "PONG":
