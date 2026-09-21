@@ -151,9 +151,42 @@ def start(service: Service, *, append_log: bool = False, extra_env: dict | None 
     return 0
 
 
+def forget_heartbeat(service: Service) -> None:
+    """Say in the store that this half is gone.
+
+    Liveness there is a heartbeat, not a pidfile, and a beat outlives the
+    process that made it by a minute. The loop reads the loop's beat when it
+    starts and refuses if another one looks alive, so without this a diary
+    stopped on purpose blocks the next one for the rest of the stale window.
+
+    `riddle dev` clears it for the same reason on every reload, which is why
+    this is not private.
+
+    Best effort on purpose: a missing, locked or simply absent store is not a
+    reason a stop fails.
+    """
+    try:
+        from riddle import config
+        from riddle.store import Store
+
+        store = Store.attach(config.get().db)
+        if store is None:
+            return
+        try:
+            store.gone("loop" if service is DIARY else "voice")
+        finally:
+            store.conn.close()
+    except Exception as exc:  # noqa: BLE001 - never fail a stop over bookkeeping
+        print(f"could not clear the heartbeat: {exc}", file=sys.stderr)
+
+
 def stop(service: Service, *, timeout: float = 6.0) -> int:
     pid = alive(service)
     if pid is None:
+        # Whether or not a process was found, the beat may still be there:
+        # this is also the path `riddle start` takes over a half that died
+        # seconds ago.
+        forget_heartbeat(service)
         if clear_stale(service):
             print("not running (cleared a stale pidfile)")
         else:
@@ -171,6 +204,7 @@ def stop(service: Service, *, timeout: float = 6.0) -> int:
         os.killpg(group, signal.SIGKILL)
         time.sleep(0.3)
     service.pidfile.unlink(missing_ok=True)
+    forget_heartbeat(service)
     print("stopped")
     return 0
 

@@ -53,6 +53,7 @@ BACKUPS = VAR / "backups"        # tablet snapshots: private keys, notebooks
 
 MEMORIES = VAR / "memories.txt"  # what survives a page turn
 SESSION = VAR / "session"        # the resumed Claude Code session id
+CHAT = VAR / "chat.json"        # the conversation, when the mind keeps no session
 
 # Tracked, not state: taps.json is calibration for this tablet's toolbar and
 # belongs in the repository.
@@ -83,10 +84,15 @@ def under_root(value: str | Path, base: Path = ROOT) -> Path:
     return path if path.is_absolute() else (base / path).resolve()
 
 
-def relative(path: Path) -> str:
-    """How a path is written into the store: relative to the root, if it can be."""
+def relative(path: Path, base: Path = ROOT) -> str:
+    """How a path is printed or stored: relative to `base`, if it can be.
+
+    Anything written into the store measures from `VAR`, not from the root:
+    the web server serves captures out of `VAR` by name, so a path spelled
+    from the root would point one directory too high.
+    """
     try:
-        return str(Path(path).resolve().relative_to(ROOT))
+        return str(Path(path).resolve().relative_to(base))
     except ValueError:
         return str(path)
 

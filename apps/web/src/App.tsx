@@ -1,5 +1,6 @@
 import { Composer } from '@/components/Composer'
 import { ConnectionBadge } from '@/components/ConnectionBadge'
+import { EraseButton } from '@/components/EraseButton'
 import { Timeline } from '@/components/Timeline'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useDiary } from '@/state/RiddleProvider'
@@ -12,7 +13,10 @@ export default function App() {
     <div className="flex h-dvh flex-col bg-background text-foreground">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <h1 className="text-sm font-medium tracking-wide">riddle</h1>
-        <ConnectionBadge />
+        <div className="flex items-center gap-1">
+          <ConnectionBadge />
+          <EraseButton />
+        </div>
       </header>
       {state.conn === 'closed' && (
         <Alert className="rounded-none border-x-0 border-t-0">

@@ -9,13 +9,16 @@ delay in a stroke is a SLEEP the *agent* performs, so the host only has to get
 the commands there in time. Latency shifts a stroke, it does not distort it.
 What wifi does change is that the link can now drop -- the tablet sleeps, the
 access point roams -- so the ssh options below fail fast and loudly rather than
-leaving a half-drawn stroke hanging on a dead socket.
+leaving a half-drawn stroke hanging on a dead socket. Failing fast is only
+half of it: `connect` is how a caller waits for the tablet to come back
+rather than dying with it.
 """
 
 import queue
 import subprocess
 import sys
 import threading
+import time
 from dataclasses import dataclass
 
 from riddle.device import taps as tap_store
@@ -86,6 +89,14 @@ class Device:
         self._errors.start()
 
     def _read_loop(self) -> None:
+        try:
+            self._read_lines()
+        except (OSError, ValueError):
+            pass          # the pipe was closed under us: that is the EOF
+        finally:
+            self.events.put(None)
+
+    def _read_lines(self) -> None:
         for line in self.proc.stdout:
             parts = line.split()
             if not parts:
@@ -102,12 +113,14 @@ class Device:
                 self.events.put(Touch(int(parts[1]), int(parts[2])))
             elif parts[0] == "PONG":
                 self._pongs.put(True)
-        self.events.put(None)
 
     def _error_loop(self) -> None:
         assert self.proc.stderr is not None
-        for line in self.proc.stderr:
-            print(f"riddled: {line.rstrip()}", file=sys.stderr)
+        try:
+            for line in self.proc.stderr:
+                print(f"riddled: {line.rstrip()}", file=sys.stderr)
+        except (OSError, ValueError):
+            pass
 
     def _send(self, line: str) -> None:
         assert self.proc.stdin is not None
@@ -185,6 +198,31 @@ class Device:
         """Whether the agent is still on the other end of the pipe."""
         return self.proc.poll() is None
 
+    def ready(self, timeout: float = 10.0) -> bool:
+        """Whether the agent answered a PING, which is the only real proof.
+
+        A route that does not exist fails nowhere near the constructor: ssh
+        is spawned perfectly happily and then exits a second or two later
+        with its complaint on stderr, so `alive()` believes anything if it is
+        asked soon enough. A pong has been all the way to the tablet and
+        back.
+        """
+        try:
+            self._send("PING")
+        except (BrokenPipeError, OSError, ValueError):
+            return False
+        # Waited for in slices, so a dial at an address nothing answers costs
+        # the second ssh takes to give up rather than the whole timeout.
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                self._pongs.get(timeout=0.2)
+                return True
+            except queue.Empty:
+                if self.proc.poll() is not None:
+                    return False
+        return False
+
     def sync(self, timeout: float = 600.0) -> None:
         """Block until the tablet has worked through everything queued.
 
@@ -200,6 +238,55 @@ class Device:
     def close(self) -> None:
         try:
             self._send("QUIT")
-        except (BrokenPipeError, ValueError):
+        except (BrokenPipeError, OSError, ValueError):
             pass
         self.proc.terminate()
+        # Reaped and closed rather than abandoned to the garbage collector: a
+        # loop that reconnects all afternoon would otherwise leave an
+        # afternoon of dead ssh behind it, and finalising the stdin of a dead
+        # one raises a broken pipe from nowhere in particular.
+        try:
+            self.proc.wait(timeout=3.0)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+        for pipe in (self.proc.stdin, self.proc.stdout, self.proc.stderr):
+            try:
+                if pipe is not None:
+                    pipe.close()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
+
+
+def connect(
+    host: str | None = None,
+    *,
+    agent: str = REMOTE_AGENT,
+    on_wait=None,
+    first_delay: float = 2.0,
+    max_delay: float = 10.0,
+) -> "Device":
+    """Keep dialling until the tablet answers, and hand back the live pipe.
+
+    The tablet is not a server: it sleeps, its access point roams, and its
+    address is whatever DHCP last thought. A link that can drop for ordinary
+    reasons should not need a person to restart anything, so this waits
+    instead of failing -- which is the whole difference between "the wifi
+    blinked" and "the diary is down".
+
+    `on_wait(tries, delay)` is called before each sleep, and is where the
+    caller says so out loud and keeps its own heartbeat alive; the wait is
+    unbounded on purpose, because a tablet that comes back in an hour should
+    still find the diary listening.
+    """
+    delay = first_delay
+    tries = 0
+    while True:
+        device = Device(host=host, agent=agent)
+        if device.ready():
+            return device
+        device.close()
+        tries += 1
+        if on_wait is not None:
+            on_wait(tries, delay)
+        time.sleep(delay)
+        delay = min(max_delay, delay * 2)

@@ -15,7 +15,11 @@ type Live = {
  *  Opening the audio socket is what starts a recording and closing it is what
  *  ends one, so there is no start or stop message that can fall out of step
  *  with what the microphone is actually doing. */
-export function useAudioCapture(level: React.RefObject<number>) {
+export function useAudioCapture(
+  level: React.RefObject<number>,
+  mic: { deviceId?: string; forget?: () => void; refresh?: () => void } = {},
+) {
+  const { deviceId, forget, refresh } = mic
   const live = useRef<Live | null>(null)
   const [state, setState] = useState<CaptureState>('idle')
 
@@ -47,26 +51,53 @@ export function useAudioCapture(level: React.RefObject<number>) {
     }
 
     setState('requesting')
+    // Ask for 16 kHz and assume you did not get it; the worklet resamples.
+    // `deviceId` is the only exact constraint, because it is the one the
+    // person chose and silently opening a different microphone is the bug
+    // this picker exists to fix.
+    const want: MediaTrackConstraints = {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: 16000,
+    }
+    const ask = (id?: string) =>
+      navigator.mediaDevices.getUserMedia({
+        audio: id ? { ...want, deviceId: { exact: id } } : want,
+      })
+
     let stream: MediaStream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000,
-        },
-      })
+      stream = await ask(deviceId || undefined)
     } catch (err) {
-      setState('idle')
-      toast.error('The microphone was refused', { description: String(err) })
-      return
+      const name = err instanceof Error ? err.name : ''
+      const gone = name === 'OverconstrainedError' || name === 'NotFoundError'
+      if (!deviceId || !gone) {
+        setState('idle')
+        toast.error('The microphone was refused', { description: String(err) })
+        return
+      }
+      // The remembered microphone was unplugged between visits. Fall back to
+      // the system default rather than refusing to listen at all.
+      try {
+        stream = await ask()
+      } catch (also) {
+        setState('idle')
+        toast.error('The microphone was refused', { description: String(also) })
+        return
+      }
+      forget?.()
+      toast.warning('That microphone is gone', {
+        description: 'Listening on the system default instead.',
+      })
     }
 
+    // Labels are hidden until the microphone has been granted once, so this
+    // is the moment the picker can show real device names.
+    refresh?.()
+
     try {
-      // Ask for 16 kHz and assume you did not get it. The worklet resamples
-      // either way, so this is an optimisation and not a contract.
       let ctx: AudioContext
       try {
         ctx = new AudioContext({ sampleRate: 16000, latencyHint: 'interactive' })
@@ -125,7 +156,7 @@ export function useAudioCapture(level: React.RefObject<number>) {
       setState('idle')
       toast.error('Could not start listening', { description: String(err) })
     }
-  }, [level, stop])
+  }, [level, stop, deviceId, forget, refresh])
 
   return { state, start, stop }
 }

@@ -55,6 +55,10 @@ export type ClientMessage =
   | { type: 'ping'; t: number }
   | { type: 'note'; text: string }
   | { type: 'send'; at_ms: number; draft: string }
+  /** the eraser: the diary rubs its ink off the page, forgets the
+   *  conversation and deletes this session's rows. Nothing is acknowledged;
+   *  the `tool` row with `meta.doing === 'cleared'` is what says it happened */
+  | { type: 'clear' }
 
 /** A row on screen: either something the server told us, or something we have
  *  said but not yet seen come back. */

@@ -15,11 +15,12 @@ import threading
 import time
 
 from riddle import config, paths
-from riddle.device import Device, PenUp, Sample, Tool, Touch, notebook, pages
+from riddle.device import PenUp, Sample, Tool, Touch, agent, notebook, pages
 from riddle.ink import hershey, render
 from riddle.ink.geometry import SCREEN_H, SCREEN_W
 from riddle.ink.style import Palette
-from riddle.mind.llm import Diary, Question
+from riddle.mind import open as open_mind
+from riddle.mind.persona import Question
 from riddle.mind.memory import Memory
 from riddle.store import Store
 
@@ -109,18 +110,17 @@ class Session:
         self.palette = Palette(body=cfg.font_body, accent=cfg.font_accent)
         self.store = self._open_store()
         self.memory = Memory(paths.MEMORIES, on_keep=self._remembered)
-        self.diary = Diary(
-            model=cfg.model,
-            max_words=cfg.max_words,
-            session_file=paths.SESSION,
-            memory=self.memory,
-        )
-        self.device = Device(host=cfg.ssh_host)
+        self.diary = open_mind(cfg, memory=self.memory)
+        self.device = self._connect("the diary is starting")
         self.strokes: list[list[tuple[float, float]]] = []
         # When each stroke began and ended, on the store's clock rather than
         # the tablet's: Sample.t_ms is the agent's own monotonic clock and is
         # not comparable with anything written here.
         self.stroke_times: list[tuple[int, int]] = []
+        # Every stroke the diary has drawn on the page and not taken off
+        # again. The eraser on the page can only rub out ink it knows the
+        # shape of, and this is the whole of what it knows.
+        self.page_ink: list[list[tuple[float, float]]] = []
         self.current: list[tuple[float, float]] = []
         self.current_began = 0
         self.last_input = 0.0
@@ -140,6 +140,10 @@ class Session:
         self.answering = threading.Event()
         self._last_beat = 0.0
         self._last_pump = 0.0
+        # Page turns noticed by the watcher thread. Forgetting writes a `tool`
+        # row, and the store's connection belongs to this thread, so the
+        # watcher posts the reason here and the loop does the forgetting.
+        self.turned: queue.Queue[str] = queue.Queue()
 
     # --- the store -------------------------------------------------------
 
@@ -179,13 +183,78 @@ class Session:
             self._last_beat = now
             self.store.beat()
 
+    # --- the link to the tablet -----------------------------------------
+
+    def _connect(self, why: str) -> agent.Device:
+        """Wait for the tablet, for as long as it takes.
+
+        A loop that exits because the wifi blinked is a loop somebody has to
+        notice and start again -- and nothing says so: the page you speak
+        into is still up, still cheerfully saying the diary is listening. So
+        the link is waited for instead, both at startup and after a drop, and
+        the waiting goes on the timeline rather than only into the log.
+
+        The heartbeat is kept up through the wait for a reason that is not
+        cosmetic. A second diary refuses to start while the first one is
+        beating, and that refusal is the only thing standing between one
+        digitizer and two ssh pipes interleaving strokes into it.
+        """
+
+        def waiting(tries: int, delay: float) -> None:
+            if tries == 1:
+                print(f"no tablet at {self.cfg.ssh_host} ({why}); waiting", file=sys.stderr)
+                self.store.add_event(
+                    "tool", meta={"doing": "waiting for the tablet", "why": why}
+                )
+            self.beat()
+
+        device = agent.connect(self.cfg.ssh_host, on_wait=waiting)
+        print(f"tablet answered on {self.cfg.ssh_host}", file=sys.stderr)
+        return device
+
+    def reconnect(self) -> None:
+        """The pipe died under us: wait for the tablet, then carry on.
+
+        What the pen was in the middle of is dropped, because a stroke cut in
+        half by a dead socket is not a stroke. The diary's own ink is dropped
+        too: the eraser can only rub out what it knows the shape of, and by
+        the time the tablet is back the page under that ink may not be the
+        page it was drawn on. Same reasoning as a page turn.
+
+        What survives is the conversation and the strokes already filed --
+        the writing is still sitting on the page, and it is still a question.
+        """
+        self.store.add_event("error", text="the tablet went away")
+        print("the tablet went away", file=sys.stderr)
+        self.device.close()
+        self.current = []
+        self.pen_down = False
+        self.tool = "pen"
+        self.page_ink = []
+        self.device = self._connect("the link dropped")
+        self.store.add_event("tool", meta={"doing": "back on the tablet"})
+        # Whatever silence the drop bought does not count as a pause.
+        self.last_input = time.monotonic()
+
     # --- housekeeping ----------------------------------------------------
 
     def forget(self, reason: str) -> None:
         """Start a new conversation, keeping only what was written to memory."""
         self.diary.forget()
+        # Whatever the diary wrote is on the page that just went away, so the
+        # eraser must not go looking for it on the one that replaced it.
+        self.page_ink = []
         self.store.add_event("tool", meta={"doing": "forgetting", "why": reason})
         print(f"{reason}: forgetting the conversation", file=sys.stderr)
+
+    def forget_turned_pages(self) -> None:
+        """Do the forgetting the watcher asked for, on the thread that can."""
+        while True:
+            try:
+                reason = self.turned.get_nowait()
+            except queue.Empty:
+                return
+            self.forget(reason)
 
     def run(self) -> None:
         cfg = self.cfg
@@ -214,7 +283,8 @@ class Session:
                 "doing": "opened",
                 "host": cfg.ssh_host,
                 "notebook": cfg.notebook,
-                "model": cfg.model,
+                "mind": cfg.mind,
+                "model": cfg.deepseek_model if cfg.mind == "deepseek" else cfg.model,
             },
         )
 
@@ -225,7 +295,7 @@ class Session:
         page = pages.Page(cfg.ssh_host)
         threading.Thread(
             target=pages.watch,
-            args=(page, self.forget, self.answering.is_set),
+            args=(page, self.turned.put, self.answering.is_set),
             daemon=True,
         ).start()
 
@@ -236,8 +306,8 @@ class Session:
                 event = None
 
             if event is None and self.device.proc.poll() is not None:
-                self.store.add_event("error", text="the device agent exited")
-                raise SystemExit("device agent exited")
+                self.reconnect()
+                continue
 
             if isinstance(event, Sample):
                 if not self.current:
@@ -258,6 +328,7 @@ class Session:
                 self.last_input = time.monotonic()
 
             self.beat()
+            self.forget_turned_pages()
             self.pump()
 
             idle = time.monotonic() - self.last_input
@@ -364,6 +435,9 @@ class Session:
             self.forget("asked from the page")
             self.store.finish_intent(intent["id"], ok=True, result={"forgot": True})
             return
+        if action == "clear":
+            self.wipe(intent)
+            return
         # Recognised and refused, rather than unknown: the page, and any other
         # thing that leaves intents, deserves a definite answer. Injecting
         # arbitrary ink into whatever notebook happens to be open is exactly
@@ -376,6 +450,71 @@ class Session:
         self.store.finish_intent(intent["id"], ok=False, result={"error": reason})
         self.store.add_event("error", text=reason, meta={"intent": intent["id"]})
         print(f"refused intent {intent['id']}: {reason}", file=sys.stderr)
+
+    def wipe(self, intent: dict) -> None:
+        """The eraser on the page: take the ink off, and forget it happened.
+
+        Three things at once, in this order, because each one is only safe
+        once the one before it has happened. The pen comes first: the ink is
+        the only part that cannot be redone, and the geometry that says where
+        it is lives in this process. Then the conversation, then the rows.
+
+        `answering` is held for the whole of it so the page watcher does not
+        read the eraser as the writer wiping the page -- which would call
+        `forget` underneath us and take `page_ink` with it -- and so no intent
+        is served in the middle.
+        """
+        self.answering.set()
+        try:
+            # What is on the page, as far as anything here knows: the diary's
+            # own replies, and the writing nobody has answered yet.
+            ink = self.page_ink + self.strokes
+            if ink:
+                print(f"clearing {len(ink)} stroke(s) off the page", file=sys.stderr)
+                self.device.draw(ink, eraser=True, step_ms=2)
+                self.device.sync()
+            self.page_ink, self.strokes, self.stroke_times = [], [], []
+
+            self.diary.forget()
+            files = self.store.clear() or []
+            gone = sum(self._unlink(name) for name in files)
+
+            # Written after the wipe, so it survives it. This is how an open
+            # page learns the timeline behind it no longer exists: there is
+            # no other message, and there does not need to be one.
+            self.store.add_event("tool", meta={"doing": "cleared", "files": gone})
+            self.store.finish_intent(intent["id"], ok=True, result={"files": gone})
+            print(f"cleared the timeline and {gone} file(s)", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001 - an intent is never left running
+            # A dropped ssh pipe mid-erase is the likely one, and it must not
+            # take the loop with it or leave the row claimed for ever.
+            reason = f"could not clear the page: {exc}"
+            self.store.finish_intent(intent["id"], ok=False, result={"error": reason})
+            self.store.add_event("error", text=reason, meta={"intent": intent["id"]})
+            print(reason, file=sys.stderr)
+        finally:
+            self.answering.clear()
+            self.settle(self.store.now_ms())
+
+    def _unlink(self, name: str) -> bool:
+        """Delete one file an erased row named, if it is ours to delete.
+
+        The path is spelled relative to `var/`; rows written before that was
+        true spell it from the checkout. Either way it is resolved and
+        checked, because a path out of the database is still a path out of a
+        file, and nothing outside `var/` is the diary's to remove.
+        """
+        for base in (paths.VAR, paths.ROOT):
+            found = (base / name).resolve()
+            if not found.is_relative_to(paths.VAR) or not found.is_file():
+                continue
+            try:
+                found.unlink()
+                return True
+            except OSError as exc:  # a file being read, a permission, a race
+                print(f"could not remove {name}: {exc}", file=sys.stderr)
+                return False
+        return False
 
     # --- answering -------------------------------------------------------
 
@@ -413,7 +552,7 @@ class Session:
                 written,
                 times,
                 turn=turn,
-                path=paths.relative(image),
+                path=paths.relative(image, paths.VAR),
                 meta={"during_answer": False},
             )
         print(f"[{len(written)} strokes] thinking...", file=sys.stderr)
@@ -465,11 +604,18 @@ class Session:
             erasing.join()
         thinking.join()
 
-        answer = pending[0] if pending else None
+        answer, failed = pending[0] if pending else (None, "the model returned nothing")
         if answer is None:
-            self.store.end_turn(turn, error="the model returned nothing")
+            reason = f"the model failed: {failed}" if failed else "the model returned nothing"
+            self.store.end_turn(turn, error=reason)
+            # Without this the page waits on "thinking" for ever: an error
+            # event is how it learns an outcome, and a turn that produced no
+            # reply is an outcome.
+            self.store.add_event(
+                "error", turn=turn, text=reason, meta={"intent": (intent or {}).get("id")}
+            )
             if intent:
-                self.store.finish_intent(intent["id"], ok=False, result={"error": "no reply"})
+                self.store.finish_intent(intent["id"], ok=False, result={"error": reason})
             if written:
                 # Nothing came back, so give the writer their words again
                 # rather than leaving a blank page where the question was.
@@ -484,6 +630,10 @@ class Session:
             "reply", turn=turn, text=answer.text, meta={"intent": (intent or {}).get("id")}
         )
         print(f"diary: {answer.text}", file=sys.stderr)
+        # On this thread, not the model's: keeping a line mirrors it onto the
+        # timeline, and that is a store write.
+        for note in answer.remember:
+            self.memory.keep(note)
         time.sleep(0.4)
 
         self.store.add_event("tool", turn=turn, meta={"doing": "writing"})
@@ -561,14 +711,21 @@ class Session:
         self.device.select("pen")
         self.device.draw(ink, pressure=self.pressure, step_ms=6)
         self.device.sync()
+        self.page_ink.extend(ink)
 
-    def _ask(self, question: Question):
+    def _ask(self, question: Question) -> tuple:
+        """Run the model, and carry the outcome back. Writes nothing.
+
+        This runs in a worker thread so the model and the eraser overlap, and
+        the store's connection belongs to the loop's thread: one connection,
+        one thread, and sqlite3 enforces it. So both halves of the outcome --
+        the answer, or what went wrong -- are handed back and written there.
+        """
         try:
-            return self.diary.reply_to(question, ago=self._ago)
-        except Exception as exc:
+            return self.diary.reply_to(question, ago=self._ago), None
+        except Exception as exc:  # noqa: BLE001 - a failed turn is not a dead loop
             print(f"diary failed: {exc}", file=sys.stderr)
-            self.store.add_event("error", text=f"the model failed: {exc}")
-            return None
+            return None, str(exc)
 
     def _ago(self, t_ms: int) -> str:
         from riddle.store.db import ago

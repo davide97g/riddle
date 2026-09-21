@@ -2,6 +2,13 @@
 
 Both get the same five verbs from the same builder, because they used to be
 the same forty lines of bash twice and had already begun to drift.
+
+`riddle start` is the pair of them: stop both, then bring both up. It is the
+command for "make it work", and the only one that knows the order.
+
+`riddle dev` is the same pair in this terminal, plus the client's dev server,
+with both halves coming back when the python changes. The supervising is in
+`riddle.dev`; this module only declares the flags.
 """
 
 def _verbs(sub, service, extra_help: str = "") -> None:
@@ -74,6 +81,42 @@ def _restart(args, service) -> int:
     return _start(args, service)
 
 
+def _start_both(args) -> int:
+    """`riddle start`: the pair, from whatever state the machine is in.
+
+    Both are stopped before either is started, because a half-running machine
+    is exactly what fails confusingly. A second loop refuses to start while
+    the first is still beating -- two ssh pipes into one digitizer interleave
+    strokes -- and a voice server brought up beside a dying one joins the
+    session it is about to lose.
+
+    Then up in one order: the page first, the pen second. Either may create
+    the session, but the loop is the half that will not start if the tablet
+    is unreachable, and its failure is easier to read when the page is
+    already there to show it.
+    """
+    from riddle import process
+
+    code = 0
+    for service in (process.DIARY, process.VOICE):
+        print(f"-- {service.name}")
+        process.stop(service, timeout=args.timeout)
+    for service in (process.VOICE, process.DIARY):
+        print(f"\n-- {service.name}")
+        code |= process.start(service, append_log=args.append_log)
+        if service is process.VOICE and not code:
+            _say_where(service)
+    if code:
+        print("\nthat did not come up clean: riddle doctor, or riddle <half> log")
+    return code
+
+
+def _dev(args) -> int:
+    from riddle import dev
+
+    return dev.run(timeout=args.timeout, web=args.web, tailnet=args.tailnet)
+
+
 def _say_where(service) -> None:
     """The voice server is only useful if you know how to reach it."""
     from riddle import config, tailnet
@@ -99,6 +142,24 @@ def add(sub) -> None:
 
     _verbs(sub, DIARY, "the loop that watches the page and answers on it")
     verbs = _verbs(sub, VOICE, "the page you speak into")
+
+    both = sub.add_parser("start", help="stop whatever is running, then bring both halves up")
+    both.add_argument("--append-log", action="store_true",
+                      help="keep the previous logs instead of rotating them")
+    both.add_argument("--timeout", type=float, default=6.0, metavar="S",
+                      help="how long each half gets to stop politely")
+    both.set_defaults(run=_start_both)
+
+    dev = sub.add_parser(
+        "dev", help="like start, but in this terminal and reloaded when the code changes"
+    )
+    dev.add_argument("--no-web", dest="web", action="store_false",
+                     help="leave the client out; the halves alone")
+    dev.add_argument("--tailnet", action="store_true",
+                     help="hot reload behind tailscale serve, for a phone")
+    dev.add_argument("--timeout", type=float, default=6.0, metavar="S",
+                     help="how long each half gets to stop politely")
+    dev.set_defaults(run=_dev)
 
     share = verbs.add_parser("share", help="put a real certificate in front of it, for a phone")
     share.add_argument(

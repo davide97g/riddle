@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS events (
   wall_ms     INTEGER NOT NULL,          -- unix epoch ms
   turn        INTEGER,                   -- the turn that claimed it; NULL until claimed
   text        TEXT,                      -- transcript, reply, note; NULL for binary kinds
-  path        TEXT,                      -- captures/*.png or audio/*.wav, relative to root
+  path        TEXT,                      -- captures/*.png or audio/*.wav, relative to var/
   meta        TEXT    NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS events_by_time ON events(session_id, t_ms);
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS intents (
   session_id  INTEGER REFERENCES sessions(id),
   made_ms  INTEGER NOT NULL,
   source   TEXT    NOT NULL,             -- web|mcp|tool
-  action   TEXT    NOT NULL,             -- send|draw|erase|shot|forget
+  action   TEXT    NOT NULL,             -- send|clear|draw|erase|shot|forget
   args     TEXT    NOT NULL DEFAULT '{}',
   state    TEXT    NOT NULL DEFAULT 'pending',  -- pending|running|done|failed
   result   TEXT,

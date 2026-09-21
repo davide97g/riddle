@@ -54,7 +54,8 @@ and why the bind address should stay `127.0.0.1`. `share` refuses when
 nothing is listening on the port, because a certificate in front of a dead
 port shows the phone a 502 and sends you to debug the wrong layer.
 
-For development: `riddle web dev --tailnet`. Hot reload has to dial 443 over
+For development: `riddle web dev --tailnet`, or `riddle dev --tailnet` for
+that dev server and both halves at once. Hot reload has to dial 443 over
 `wss` because tailscale terminates the TLS, and `RIDDLE_SERVER` points the
 proxy at the Python server.
 
@@ -113,6 +114,21 @@ row is only the record of it.
 Send is disabled when the diary is not running, because nothing would answer
 it. The mic button is disabled when there is no speech model.
 
+Under the level meter is **which microphone is listened to**. A browser lists
+no inputs at all until it has granted one, so before the first recording the
+control is a *Choose microphone* button: pressing it opens the default input
+for as long as it takes to learn the names, then lets go. The choice is kept
+in the browser, per browser, and used for every recording after it. It cannot
+be changed while a recording is running, because two inputs spliced into one
+sentence is worse than the wrong one throughout.
+
+A microphone that is chosen and then unplugged falls back to the system
+default at the next press, and says so rather than refusing to listen.
+
+This is worth checking first when nothing is transcribed: a recording from a
+silent input reaches the server, is gated as silence and produces no
+utterance at all, which looks exactly like a broken model.
+
 ## What is written down
 
 `var/audio/*.wav` are recordings of your room, pruned after
@@ -125,6 +141,7 @@ running in a room with other people in it.
 | what you see | why |
 |---|---|
 | mic button disabled | no speech model, or the diary is offline, or the socket is closed |
+| the meter never moves, and nothing is transcribed | a silent input is selected: pick another under the meter |
 | a TypeError about mediaDevices | not a secure context: `riddle voice share` |
 | the page says it has not been built | `riddle web build` |
 | Send does nothing | the loop is not running; the intent waits, and expires after two minutes |

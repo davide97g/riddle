@@ -231,6 +231,12 @@ class Server:
             if text:
                 self.store.add_event("note", text=text)
             return
+        if kind == "clear":
+            # No acknowledgement: nothing is pending on it, and the page
+            # learns it happened from the `tool` row the loop writes once the
+            # ink is off. Like a note, this is left and not waited on.
+            self.store.push_intent("web", "clear")
+            return
         if kind == "send":
             at_ms = int(msg.get("at_ms", self.store.now_ms()))
             intent = self.store.push_intent(

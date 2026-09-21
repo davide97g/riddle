@@ -31,6 +31,13 @@ a heartbeat — `loop_ms` and `voice_ms`, beaten every five seconds — and not
 `ended_ms`, because a process that is killed outright never gets to write
 `ended_ms`. A session nobody has beaten in a minute is over.
 
+A beat therefore outlives the process that made it, for up to that minute,
+and the loop refuses to start while another loop looks alive. So **stopping a
+half clears its beat** — `Store.gone(role)`, called by `riddle <half> stop` —
+and a diary stopped on purpose does not block the next one. A half that was
+killed outright still has to wait the window out, which is the conservative
+half of the trade.
+
 - `Store.join(path, role)` — the two halves. Never refuses.
 - `Store.attach(path)` — a read-only look at whatever is running, or `None`.
   Not an exception: a library cannot know whether "nobody is running" is
@@ -64,7 +71,7 @@ streams itself.
 | `speech` | the voice server | `text`, `path` to the clip |
 | `note` | the page, or the loop | `text`; `meta.remember` when the diary kept it |
 | `reply` | the loop | `text`, `meta.intent` when a send caused it |
-| `tool` | the loop | `meta.doing`: opened, thinking, writing, forgetting |
+| `tool` | the loop | `meta.doing`: opened, thinking, writing, forgetting, cleared, waiting for the tablet, back on the tablet |
 | `error` | either | `text` |
 | `shot` | nothing yet | reserved for a screenshot |
 
@@ -120,6 +127,23 @@ Rules that keep it honest:
   only be one a previous loop died holding: it is swept to `failed`.
 - A pending intent older than two minutes is discarded. A send pressed while
   the tablet was unplugged must not fire when it reconnects.
+
+## Clearing
+
+`Store.clear()` deletes **this session's** `events` and `turns` and returns
+the paths those rows named. Strokes go with their event through
+`ON DELETE CASCADE` and the FTS index through its delete trigger.
+
+It deletes rather than hiding, because a timeline the page cannot see but
+`recall` can still search is two different pasts. It does **not** unlink the
+captures or the clips: the store owns a sqlite connection and nothing else,
+and a filesystem walk inside a write transaction is exactly what the rule
+below forbids. The loop does that, because the loop asked.
+
+Only the loop ever calls it, as the `clear` intent, after it has taken its
+ink off the page. The `tool` row it writes afterwards -- `meta.doing` is
+`cleared` -- survives the wipe and is how an open page learns that everything
+behind it is gone.
 
 ## The two rules for writers
 

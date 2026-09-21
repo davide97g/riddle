@@ -147,6 +147,20 @@ class Store:
             (int(time.time() * 1000), self.session_id),
         )
 
+    def gone(self, role: str) -> None:
+        """Take a half's heartbeat out, because it was stopped on purpose.
+
+        A SIGTERM does not run the victim's cleanup, so its last beat sits in
+        the row looking alive for the whole stale window -- and a new loop
+        refuses to start while another loop looks alive. That made `riddle
+        start` fail for a minute after a stop. Whoever did the stopping knows
+        better than the clock does; this is it saying so.
+        """
+        column = "loop_ms" if role == "loop" else "voice_ms"
+        self.conn.execute(
+            f"UPDATE sessions SET {column} = NULL WHERE id = ?", (self.session_id,)
+        )
+
     def present(self, role: str) -> int | None:
         """How long ago the other half last said it was there, in ms."""
         column = "loop_ms" if role == "loop" else "voice_ms"
@@ -301,6 +315,32 @@ class Store:
             (turn, self.session_id, *kinds, from_ms, to_ms),
         )
         return done.rowcount
+
+    def clear(self) -> list[str]:
+        """Wipe this session's timeline, and name the files it orphaned.
+
+        The eraser on the page means the conversation did not happen, so the
+        rows go rather than being hidden behind a marker: a timeline the page
+        cannot see but `recall` still searches is two different pasts.
+
+        What is *not* deleted here is the files those rows named. The store
+        owns one sqlite connection and nothing else; whoever asked for the
+        wipe unlinks the captures and the clips, so a slow filesystem can
+        never hold a write transaction open.
+        """
+        files = [
+            row["path"]
+            for row in self.conn.execute(
+                "SELECT path FROM events WHERE session_id = ? AND path IS NOT NULL",
+                (self.session_id,),
+            ).fetchall()
+        ]
+        with self._tx():
+            # strokes hang off events with ON DELETE CASCADE, and the fts
+            # index is kept by the delete trigger; both follow from this.
+            self.conn.execute("DELETE FROM events WHERE session_id = ?", (self.session_id,))
+            self.conn.execute("DELETE FROM turns WHERE session_id = ?", (self.session_id,))
+        return files
 
     # --- reading ---------------------------------------------------------
 

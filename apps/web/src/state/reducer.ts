@@ -50,6 +50,7 @@ export type Action =
   | { type: 'pending'; id: string; text: string }
   | { type: 'failed'; id: string }
   | { type: 'acked'; id: string; intent: number }
+  | { type: 'cleared' }
 
 /** Insert keeping `order` sorted by when the thing happened.
  *
@@ -120,6 +121,12 @@ export function reduce(state: State, action: Action): State {
       if (row?.kind !== 'pending') return state
       return place(state, { ...row, failed: true })
     }
+    case 'cleared':
+      // Optimistic, and the only reason the button feels like a button: the
+      // loop has to take the ink off the page before it can say it cleared
+      // anything, and that is seconds of eraser. The server's own row wipes
+      // the same state again when it lands.
+      return { ...state, rows: new Map(), order: [] }
     case 'server': {
       const msg = action.msg
       if (msg.type === 'hello.ok') {
@@ -147,10 +154,14 @@ export function reduce(state: State, action: Action): State {
       }
       if (msg.type === 'event') {
         const { type: _ignored, ...event } = msg
-        return {
-          ...settle(state, event as DiaryEvent),
-          seq: Math.max(state.seq, event.id),
-        }
+        const row = event as DiaryEvent
+        const seq = Math.max(state.seq, row.id)
+        // The rows behind this one were deleted from the store, so the page
+        // drops them rather than showing a past nothing else can see. The
+        // marker itself is not placed: what is left is an empty timeline.
+        if (row.kind === 'tool' && row.meta.doing === 'cleared')
+          return { ...state, rows: new Map(), order: [], seq }
+        return { ...settle(state, row), seq }
       }
       return state
     }

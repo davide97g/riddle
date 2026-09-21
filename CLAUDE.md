@@ -9,6 +9,8 @@ that will bite you.
 ```bash
 ./riddle --help                    # the whole surface
 ./riddle doctor                    # run this first, and after any change to paths
+./riddle start                     # stop both halves, then start both
+./riddle dev                       # both halves plus vite here, reloaded on save
 ./riddle diary start|stop|status|log
 ./riddle voice start|share|unshare
 ./riddle device build              # cross-compile riddled and deploy it
@@ -118,4 +120,7 @@ framebuffer out of another process, `store/db.py` on the writer rules.
   blows the stack on long skeleton runs, and one is numpy-vectorised while
   the other is a pure-Python loop. Unifying them is a real behaviour change
   and belongs in its own commit.
-- Nothing reconnects automatically when the tablet's wifi drops.
+- A dropped link is waited out, not recovered from: the loop redials until
+  the tablet answers, but the half-finished stroke and its memory of its own
+  ink on the page are gone. The voice server and the page reconnect on their
+  own too, so nothing has to be restarted by hand.

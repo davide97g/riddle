@@ -9,6 +9,7 @@ type Diary = {
   setDraft: (text: string) => void
   note: (text: string) => void
   send: () => void
+  clear: () => void
 }
 
 const Context = createContext<Diary | null>(null)
@@ -51,8 +52,16 @@ export function RiddleProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'draft', text: '' })
   }, [say, state])
 
+  const clear = useCallback(() => {
+    // The rows go now; the ink takes as long as the eraser takes. Nothing is
+    // waited on, and a second press while the first is still running only
+    // leaves a second intent, which finds nothing left to rub out.
+    dispatch({ type: 'cleared' })
+    say({ type: 'clear' })
+  }, [say])
+
   return (
-    <Context.Provider value={{ state, setDraft, note, send }}>
+    <Context.Provider value={{ state, setDraft, note, send, clear }}>
       {children}
     </Context.Provider>
   )

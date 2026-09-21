@@ -54,7 +54,7 @@ cp .env.example .env     # every line is commented out at its default
 ./riddle doctor
 
 # 6. open a notebook on the tablet, then
-./riddle diary start
+./riddle diary start     # or `./riddle start` for this half and the page both
 ```
 
 Write something. Stop. Wait three seconds.
@@ -74,6 +74,9 @@ setup, including why it will not get a microphone over plain http:
 ones worth knowing:
 
 ```bash
+./riddle start                                 # stop both halves, then start both
+./riddle dev                                   # both halves plus the client, in
+                                               #   this terminal, reloaded on save
 ./riddle diary start|stop|status|log|restart   # the loop, in the background
 ./riddle diary start --foreground              # or in this terminal
 ./riddle voice start|...|share|unshare         # the page you speak into
@@ -107,9 +110,11 @@ Take a backup first: `./riddle backup create`.
 ## It records things
 
 Photographs of your handwriting, recordings of the room, transcripts, and
-what each turn cost — all under `var/`, which is gitignored whole. The page
-and the transcript window go to Anthropic on every turn, and the model is
-allowed to search the web.
+what each turn cost — all under `var/`, which is gitignored whole. Two
+companies see a turn by default: the photograph of the page goes to Anthropic,
+whose model reads out what is on it, and that reading plus the transcript
+window goes to DeepSeek, which writes the reply. `RIDDLE_MIND=claude` sends
+both to Anthropic instead, and lets the model search the web.
 
 Anything said near the microphone inside a turn's window becomes part of the
 question, including other people in the room.

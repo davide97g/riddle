@@ -1,15 +1,18 @@
 import { useRef } from 'react'
 import { LevelMeter } from '@/components/LevelMeter'
 import { MicButton } from '@/components/MicButton'
+import { MicPicker } from '@/components/MicPicker'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useAudioCapture } from '@/hooks/useAudioCapture'
+import { useAudioDevices } from '@/hooks/useAudioDevices'
 import { useDiary } from '@/state/RiddleProvider'
 
 export function Composer() {
   const { state, setDraft, send } = useDiary()
   const level = useRef(0)
-  const mic = useAudioCapture(level)
+  const inputs = useAudioDevices()
+  const mic = useAudioCapture(level, inputs)
   const offline = state.conn !== 'open'
 
   return (
@@ -43,6 +46,18 @@ export function Composer() {
       </div>
       <div className="mx-auto mt-2 flex max-w-2xl flex-col items-center gap-1">
         <LevelMeter level={level} live={mic.state === 'recording'} />
+        {state.listening && (
+          <MicPicker
+            devices={inputs.devices}
+            deviceId={inputs.deviceId}
+            choose={inputs.choose}
+            reveal={() => void inputs.reveal()}
+            named={inputs.named}
+            // Changing microphone mid-recording would splice two rooms into
+            // one sentence; the switch waits until the recording is over.
+            disabled={mic.state !== 'idle'}
+          />
+        )}
         <p className="text-center text-xs text-muted-foreground">
           {!state.diary.present
             ? 'The diary is not running, so nothing would answer a send.'

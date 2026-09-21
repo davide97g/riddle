@@ -102,6 +102,30 @@ def check_config() -> list[Result]:
     cfg = config.get()
     out.append(Result(OK, "config", "root", str(paths.ROOT)))
     out.append(Result(OK, "config", "db", str(cfg.db)))
+    out.extend(_mind(cfg))
+    return out
+
+
+def _mind(cfg) -> list[Result]:
+    """Who answers, and whether it can.
+
+    A missing key is the failure that looks like nothing: the loop starts,
+    the pen works, and every turn ends with an error event nobody is watching
+    for. So it is said here, before a page is written on.
+    """
+    if cfg.mind == "claude":
+        return [Result(OK, "config", "mind", f"claude, {cfg.model}")]
+    if cfg.mind != "deepseek":
+        return [Result(FAIL, "config", "mind", f"{cfg.mind!r} is not a mind",
+                       "RIDDLE_MIND is 'deepseek' or 'claude'")]
+    out = [Result(OK, "config", "mind", f"deepseek, {cfg.deepseek_model}")]
+    if cfg.deepseek_key:
+        out.append(Result(OK, "config", "deepseek key", f"set, {len(cfg.deepseek_key)} chars"))
+    else:
+        out.append(Result(FAIL, "config", "deepseek key", "not set",
+                          "put RIDDLE_DEEPSEEK_KEY in .env"))
+    # The page is read by a model that can see, whichever mind answers.
+    out.append(Result(OK, "config", "eyes", cfg.eyes_model))
     return out
 
 

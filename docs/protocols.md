@@ -93,6 +93,7 @@ Client to server:
 | `ping {t}` | answered with `pong {t}` |
 | `note {text}` | records a typed note |
 | `send {at_ms, draft}` | leaves a `send` intent, answered with `intent.ok` |
+| `clear {}` | leaves a `clear` intent: the diary rubs its ink off the page, forgets the conversation and deletes this session. Not acknowledged; the `tool` row with `meta.doing` `cleared` is what says it happened |
 
 Server to client:
 

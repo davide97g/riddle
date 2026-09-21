@@ -67,7 +67,16 @@ worth using, which is why the transport does not show up in the ink.
 What wifi adds is a link that can drop, since the tablet sleeps and its wifi
 goes with it. The agent connection sets `ServerAliveInterval` and
 `ServerAliveCountMax` so a dead link surfaces in about fifteen seconds
-instead of hanging. Nothing reconnects automatically yet.
+instead of hanging, and the loop then waits for the tablet rather than
+exiting with it: `riddle.device.agent.connect` redials with a backoff
+capped at ten seconds, for as long as it takes, at startup and after a drop
+alike. A pong is what counts as connected -- a route that does not exist
+spawns ssh perfectly happily and only fails a second later.
+
+The loop drops the half-finished stroke and forgets the shape of its own ink
+when the link comes back, because the page underneath it may not be the page
+it drew on. The timeline says both: a `tool` row `waiting for the tablet`,
+then `back on the tablet`.
 
 ### How wifi ssh was turned on
 

@@ -1,9 +1,8 @@
 """`riddle web`: the client's own toolchain, with the server's config handed in.
 
-vite.config.ts reads RIDDLE_SERVER and RIDDLE_TAILNET from its environment.
-Rather than teach it where those come from, they are injected here -- which
-is also why RIDDLE_SERVER is derived from the host and port by default, so
-moving the port cannot silently break the dev proxy.
+vite.config.ts reads RIDDLE_SERVER and RIDDLE_TAILNET from its environment;
+`riddle.toolchain` is the one place that spells them, so moving the port
+cannot silently break the dev proxy.
 """
 
 
@@ -28,20 +27,12 @@ def add(sub) -> None:
 
 
 def _bun(argv: list[str], args) -> int:
-    import os
-    import shutil
     import subprocess
 
-    from riddle import config, paths
+    from riddle import toolchain
 
-    if not shutil.which("bun"):
-        print("bun is not installed: brew install oven-sh/bun/bun")
+    if not toolchain.have_bun():
+        print(toolchain.MISSING)
         return 1
-    cfg = config.get()
-    where = paths.ROOT / "apps" / "web"
-    env = {
-        **os.environ,
-        "RIDDLE_SERVER": cfg.server,
-        "RIDDLE_TAILNET": "1" if (cfg.tailnet or getattr(args, "tailnet", False)) else "0",
-    }
-    return subprocess.run(["bun", *argv], cwd=where, env=env).returncode
+    env = toolchain.env(tailnet=getattr(args, "tailnet", False))
+    return subprocess.run(["bun", *argv], cwd=toolchain.WHERE, env=env).returncode
