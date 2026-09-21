@@ -1,7 +1,8 @@
 """Ask a model that can see the page what the diary writes back.
 
-One call per turn, with the photograph of the page attached to it. There used
-to be two -- a vision model describing the page in words, and a blind model
+One call per turn, with the photograph of what was just written attached to
+it -- and a second one only if the model asks to see the rest of the page,
+which is a tool it may call and mostly does not. There used to be two -- a vision model describing the page in words, and a blind model
 answering the description -- and that split existed only because the model
 that answered could not see. It cost a second, a second API key, and the half
 of a page that survives being turned into prose: an arrow's direction, a word
@@ -33,7 +34,9 @@ from pathlib import Path
 
 from riddle.mind.persona import (
     CLOSING,
+    LOOK_AT_PAGE,
     PERSONA,
+    WHOLE_PAGE_SENT,
     Answer,
     Question,
     memory_block,
@@ -45,6 +48,12 @@ from riddle.mind.persona import (
 # enough that the diary remembers the thread, small enough that it cannot
 # grow without bound.
 HISTORY = 24
+
+# How many times one turn may ask to see the whole page. One: the page does
+# not change while the turn runs, so a second look would photograph nothing
+# new, and every look is a full-page image and a round trip the writer is
+# sitting there waiting for.
+LOOKS = 1
 
 
 class Diary:
@@ -116,18 +125,20 @@ class Diary:
         )
 
         began = time.monotonic()
-        reply = self._post(
+        reply, looked = self._converse(
             [
                 {"role": "system", "content": self._system()},
                 *self.history,
                 {"role": "user", "content": _with_page(asked, question.image)},
             ],
+            page=question.page,
             timeout=timeout,
         )
         took_ms = int((time.monotonic() - began) * 1000)
 
-        # The page is not kept: an image in the history would be paid for on
-        # every later turn, and what it said is in the reply already.
+        # The page is not kept, and neither is the look at the whole page if
+        # there was one: an image in the history would be paid for on every
+        # later turn, and what it said is in the reply already.
         self.history += [
             {"role": "user", "content": asked},
             {"role": "assistant", "content": reply},
@@ -136,26 +147,69 @@ class Diary:
 
         reply, kept = strip_memories(reply)
         return Answer(
-            text=" ".join(reply.split()), duration_ms=took_ms, remember=kept
+            text=" ".join(reply.split()),
+            duration_ms=took_ms,
+            remember=kept,
+            looked=looked,
         )
 
-    def _post(self, messages: list[dict], timeout: int) -> str:
+    def _converse(self, messages: list[dict], page, timeout: int) -> tuple[str, bool]:
+        """The turn, and the one look at the whole page it is allowed.
+
+        The tool is offered only when there is a page to hand back, and the
+        offer is withdrawn once it has been taken, so the loop cannot run
+        more than twice however the model answers.
+
+        A `tool` message cannot carry an image -- the role takes text -- so
+        the tool says the page follows and the page follows as a user
+        message. That is the shape every provider documents for this, and it
+        is why the reply has to come from a third message rather than the
+        second.
+        """
+        looked = 0
+        while True:
+            offer = [LOOK_AT_PAGE] if page is not None and looked < LOOKS else None
+            message = self._post(messages, tools=offer, timeout=timeout)
+            calls = message.get("tool_calls") or []
+            reply = (message.get("content") or "").strip()
+            if not calls:
+                if not reply:
+                    raise RuntimeError("openai returned no reply")
+                return reply, bool(looked)
+            looked += 1
+            messages.append(message)
+            # Every call gets an answer even if the model asked twice in one
+            # message: an unanswered tool_call_id is a 400 on the next post.
+            for call in calls:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.get("id", ""),
+                        "content": "The whole page follows as an image.",
+                    }
+                )
+            messages.append(
+                {"role": "user", "content": _with_page(WHOLE_PAGE_SENT, page)}
+            )
+
+    def _post(self, messages: list[dict], timeout: int, tools=None) -> dict:
         if not self.key:
             raise RuntimeError(
                 "no OpenAI key: put RIDDLE_OPENAI_KEY in .env"
             )
-        body = json.dumps(
-            {
-                "model": self.model,
-                "messages": messages,
-                # The page holds a couple of dozen words. Anything longer is a
-                # model that has forgotten the constraint, and paying for
-                # tokens that would be cut before they reached the pen.
-                "max_tokens": 300,
-                "temperature": 1.0,
-                "stream": False,
-            }
-        ).encode()
+        asked = {
+            "model": self.model,
+            "messages": messages,
+            # The page holds a couple of dozen words. Anything longer is a
+            # model that has forgotten the constraint, and paying for tokens
+            # that would be cut before they reached the pen.
+            "max_tokens": 300,
+            "temperature": 1.0,
+            "stream": False,
+        }
+        if tools:
+            asked["tools"] = tools
+        body = json.dumps(asked).encode()
         request = urllib.request.Request(
             f"{self.url}/chat/completions",
             data=body,
@@ -179,7 +233,9 @@ class Diary:
         choices = payload.get("choices") or []
         if not choices:
             raise RuntimeError("openai returned no reply")
-        return (choices[0].get("message") or {}).get("content", "").strip()
+        # The whole message rather than its text: a turn that asks to see the
+        # page puts nothing in `content` and everything in `tool_calls`.
+        return choices[0].get("message") or {}
 
 
 def _with_page(asked: str, image: Path | None):

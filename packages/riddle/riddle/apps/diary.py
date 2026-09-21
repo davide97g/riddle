@@ -13,9 +13,10 @@ import queue
 import sys
 import threading
 import time
+from pathlib import Path
 
 from riddle import config, paths
-from riddle.device import PenUp, Sample, Tool, Touch, agent, notebook, pages
+from riddle.device import PenUp, Sample, Tool, Touch, agent, notebook, pages, screen
 from riddle.ink import hershey, render
 from riddle.ink.geometry import SCREEN_H, SCREEN_W
 from riddle.ink.style import Palette
@@ -43,6 +44,16 @@ SPEECH_GRACE_CAP_MS = 6_000
 SPEECH_QUIET_MS = 750      # no new transcript for this long means it has landed
 SEND_LOOKBACK_MS = 120_000
 ORPHAN_MS = 30_000    # how far back a turn reaches for input written late
+
+# Photographing the whole page reads ten megabytes out of xochitl's address
+# space over ssh, and it has to happen before the eraser runs or it
+# photographs a half-cleared page. So it is the one thing between the pause
+# and the ink starting to fade, and it is bounded: a tablet that does not
+# answer in this long costs the turn its context, not the turn.
+PAGE_SHOT_TIMEOUT_S = 12
+# Full resolution. The handwriting is the whole point of the picture and a
+# downscaled tile is exactly what loses it.
+PAGE_SHOT_SCALE = 1.0
 
 
 def travel(stroke: list[tuple[float, float]]) -> float:
@@ -268,6 +279,13 @@ class Session:
         )
         print(
             f"remembering {kept} thing(s) from before" if kept else "no memories yet",
+            file=sys.stderr,
+        )
+        print(
+            "the whole page is photographed each turn and offered to the model"
+            if cfg.allow_snap
+            else "the model sees only what you write between turns "
+            "(RIDDLE_ALLOW_SNAP=1 offers it the whole page)",
             file=sys.stderr,
         )
         print(f"session {self.store.session_id}", file=sys.stderr)
@@ -556,6 +574,12 @@ class Session:
             )
         print(f"[{len(written)} strokes] thinking...", file=sys.stderr)
 
+        # Before the eraser, and the only thing that is: what it photographs
+        # has to be the page as the pen left it. A turn with no ink erases
+        # nothing, so that one waits -- a send that turns out to have nothing
+        # to answer should not cost a ten-megabyte read off the tablet.
+        page = self.photograph(turn) if written else None
+
         # The ink has to start fading the moment you stop writing, so the model
         # runs while the page is being erased rather than after it. That also
         # pays for the wait below: a sentence still inside the speech model
@@ -593,7 +617,11 @@ class Session:
             self.settle(to_ms)
             return
 
-        question = Question(trigger=trigger, image=image, heard=heard, typed=typed)
+        if not written:
+            page = self.photograph(turn)
+        question = Question(
+            trigger=trigger, image=image, page=page, heard=heard, typed=typed
+        )
         self.store.add_event("tool", turn=turn, meta={"doing": "thinking"})
         thinking = threading.Thread(
             target=lambda: pending.append(self._ask(question)), daemon=True
@@ -623,6 +651,12 @@ class Session:
             self.settle(to_ms)
             return
 
+        if answer.looked:
+            self.store.add_event(
+                "tool", turn=turn, meta={"doing": "looking at the whole page"}
+            )
+            print("the diary looked at the whole page", file=sys.stderr)
+
         # Written before the pen moves, so the phone shows the answer while
         # the tablet is still inking it.
         self.store.add_event(
@@ -646,6 +680,52 @@ class Session:
         if intent:
             self.store.finish_intent(intent["id"], ok=True, result={"turn": turn})
         self.settle(to_ms)
+
+    def photograph(self, turn: int) -> Path | None:
+        """The whole page, for the model to look at if the crop is not enough.
+
+        What a turn carries is the new writing, rendered from the strokes and
+        cropped to itself. That is the question, and it is all most turns
+        need. What it is missing is everything the page already held: the
+        line being corrected, the diagram being added to, the diary's own
+        last reply. This is that, and the model asks for it by name.
+
+        It happens here, between the pause and the eraser, and nowhere else
+        it could happen would be true: a moment later the writing is fading
+        off the page and the photograph is of a page being wiped. The cost is
+        that the ink starts fading a second or two after the pen came up
+        instead of immediately.
+
+        Reading another process's address space is its own capability, so
+        this is off until someone says RIDDLE_ALLOW_SNAP=1 -- the same switch
+        `riddle snap` answers to, not a second one meaning the same thing. A
+        tablet that will not answer costs the turn its context and nothing
+        else: the turn goes on without a page to offer.
+        """
+        if not self.cfg.allow_snap:
+            return None
+        began = time.monotonic()
+        try:
+            raw = screen.png(
+                host=self.cfg.ssh_host,
+                scale=PAGE_SHOT_SCALE,
+                timeout=PAGE_SHOT_TIMEOUT_S,
+            )
+        except Exception as exc:  # noqa: BLE001 - no photograph is not a dead turn
+            print(f"could not photograph the page: {exc}", file=sys.stderr)
+            return None
+        out = paths.CAPTURES / f"whole-{int(time.time())}-{turn}.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(raw)
+        took = time.monotonic() - began
+        print(f"photographed the page in {took:.1f}s", file=sys.stderr)
+        self.store.add_event(
+            "shot",
+            turn=turn,
+            dur_ms=int(took * 1000),
+            path=paths.relative(out, paths.VAR),
+        )
+        return out
 
     def _erase(self, written) -> None:
         self.device.draw(written, eraser=True, step_ms=2)

@@ -35,8 +35,8 @@ repeated coordinates.
 ## A turn
 
 ```
-pen up ── pause ──┬─ erase the page  (device, seconds) ─┐
-                  └─ wait for speech (≤2.5s, cap 6s) ───┴─ model ─ draw
+pen up ── pause ── photograph ──┬─ erase the page  (device, seconds) ─┐
+                  (1-2s, opt.)  └─ wait for speech (≤2.5s, cap 6s) ───┴─ model ─ draw
 ```
 
 The erase and the wait happen at the same time, and that is the nicest
@@ -55,10 +55,14 @@ it, and the question goes out:
 
 | trigger | ink | what is sent |
 |---|---|---|
-| pause | always | the page, plus any transcript **as context**: *"answer what the page says; the room is only context"* |
-| send | yes | the page, the transcript and the draft |
+| pause | always | the writing, plus any transcript **as context**: *"answer what the page says; the room is only context"* |
+| send | yes | the writing, the transcript and the draft |
 | send | no | the transcript and the draft, **and no image at all** |
 | send | nothing at all | refused, with an `error` event |
+
+"The writing" is exactly that: the strokes since the last turn, rendered and
+cropped to their own bounding box. The rest of the page is a separate thing,
+below.
 
 The last two rows matter. The persona says the image is a photograph of
 their handwriting; feeding it a blank page is a lie, and the model answers it
@@ -72,6 +76,42 @@ writes, centred on the space the writing occupied.
 
 If the model returns nothing, the original strokes are drawn back rather than
 leaving a blank page where the question was.
+
+## The rest of the page
+
+What a turn carries is the new writing and nothing else. That is the
+question, and for most turns it is the whole of it. It is also cropped, so
+what the model never sees is everything the page already held: the line being
+corrected, the diagram being added to, whatever an arrow points at, the
+diary's own last reply still sitting there in a different hand.
+
+So with `RIDDLE_ALLOW_SNAP=1` the loop photographs the whole screen once per
+turn and offers it to the model as a tool, `look_at_page`, which most turns
+never call. Offered rather than attached, because a full-page image on every
+turn costs tokens and seconds on every turn to be useful on one in five.
+
+Three things about the timing, all of them forced:
+
+- **It happens before the eraser**, and that is the only place it can. A
+  moment later the writing is fading off the page and the photograph is of a
+  page being wiped.
+- **So the ink starts fading a second or two later than it otherwise would.**
+  That is the price of the feature, and it is why the feature is off by
+  default. The read is ten megabytes out of xochitl's address space over ssh,
+  gzipped on the tablet to about 36KB.
+- **A tablet that does not answer in 12 seconds costs the turn its context,
+  not the turn.** The photograph is skipped, the tool is not offered, and the
+  turn goes on.
+
+The look is capped at one per turn: the page does not change while the turn
+runs, so a second look would photograph nothing new. When it happens, a
+`tool` row says so — `meta.doing` is `looking at the whole page` — and the
+photograph itself is a `shot` row with a path, which the page renders.
+
+Reading the screen is a different capability from drawing on it, and the two
+switches stay separate: `RIDDLE_ALLOW_SNAP` is the one `riddle snap` answers
+to, and the loop answers to it too rather than inventing a third. Without it
+the loop never reads the screen, and says so at startup.
 
 ## Select the pen first
 

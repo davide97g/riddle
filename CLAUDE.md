@@ -114,7 +114,9 @@ framebuffer out of another process, `store/db.py` on the writer rules.
 - `var/captures` is never pruned; `RIDDLE_AUDIO_KEEP_DAYS` only applies at
   startup, so a voice server left up for a month never prunes either.
 - The `shot`, `erase` and `draw` intents are recognised and refused. The
-  event kind and the `/api/captures/` route exist for `shot` already.
+  loop writes `shot` events of its own -- the whole-page photograph each turn
+  takes while `RIDDLE_ALLOW_SNAP=1` -- so serving the intent is now mostly
+  wiring a button to machinery that exists.
 - There are three RDP implementations and two Zhang-Suen thinnings across
   `ink/image.py`, `ink/lineart.py` and `ink/skeleton.py`. They are *not*
   interchangeable — one is iterative on purpose because the recursive form

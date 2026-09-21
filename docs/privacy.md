@@ -13,6 +13,7 @@ entirely without breaking anything that matters.
 | where | what it is | how long it stays |
 |---|---|---|
 | `var/captures/page-*.png` | photographs of what you wrote, rendered from the strokes and sent to the model | **forever** — nothing prunes these yet |
+| `var/captures/whole-*.png` | photographs of your **whole page**, read off the tablet's screen, one per turn while `RIDDLE_ALLOW_SNAP=1` | **forever** — nothing prunes these either |
 | `var/audio/utt-*.wav` | recordings of your room, one per utterance | `RIDDLE_AUDIO_KEEP_DAYS`, 7 by default |
 | `var/riddle.db` | every transcript, every stroke, every reply, what each turn cost | until you delete it |
 | `var/memories.txt` | the handful of lines the diary chose to keep | until you delete it |
@@ -40,13 +41,23 @@ One company, and it is worth knowing what it sees.
 
 - **The photograph of your page goes to OpenAI** on every turn that has ink
   on it, attached to the turn itself. Not a description of it: the image,
-  your handwriting as you wrote it.
+  your handwriting as you wrote it. It is cropped to what you wrote since the
+  last turn.
 - **The transcript window goes with it**, along with the conversation in
   `var/chat.json` -- the words of earlier turns in this thread, though not
   their images, which are never carried forward.
-- **That is the whole list.** There is no second model and no tools: the
-  diary searches nothing, fetches nothing, and cannot see anything on this
-  machine that a turn did not hand it.
+- **The whole page goes too, when the model asks for it and only then.**
+  With `RIDDLE_ALLOW_SNAP=1` the diary photographs the entire screen before
+  it erases, and offers it as a tool the model may call once per turn. Most
+  turns do not call it; the ones that do send a picture of the whole page —
+  everything on it, including what you wrote long before this turn and have
+  not rubbed out. The photograph is taken whether or not the model asks, and
+  is kept on disk either way; what the tool decides is whether it is sent.
+  Without that variable set, the diary never reads the screen at all.
+- **That is the whole list.** There is one model and one tool, and the tool
+  only hands back a picture of your own page: the diary searches nothing,
+  fetches nothing, and cannot see anything on this machine that a turn did
+  not hand it.
 - Nothing else. The server binds loopback; `riddle voice share` exposes it
   only on your own tailnet, behind a certificate.
 

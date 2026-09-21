@@ -66,6 +66,53 @@ PAGE_ATTACHED = (
     "conversation look similar, and answer only what this one says."
 )
 
+# The rest of the page, offered rather than attached.
+#
+# The image a turn carries is cropped to what was just written, which is the
+# question. Everything around it -- what was written further up, what the
+# diary itself answered last time, whatever an arrow is pointing at -- is a
+# second full-page image, and paying for one on every turn to be useful on
+# one turn in five is the wrong trade. So the whole page is a tool the model
+# may call, and most turns never do.
+#
+# It is a photograph of the page as it stood when the pen came up: it is
+# taken before the diary erases, because by the time the model is asked the
+# writing is already fading off the page.
+WHOLE_PAGE = (
+    "The photograph above is cropped to what they have just written. The rest "
+    "of the page is not in it: earlier writing, your own replies still sitting "
+    "there, whatever a stray arrow points at. If you cannot answer this turn "
+    "without seeing that, call look_at_page once. Most turns do not need it."
+)
+
+# What the tool hands back, as the model is told to read it.
+WHOLE_PAGE_SENT = (
+    "The whole page, photographed as the pen came up. Your own earlier replies "
+    "are on it in a different hand. Answer what they wrote this time."
+)
+
+LOOK_AT_PAGE = {
+    "type": "function",
+    "function": {
+        "name": "look_at_page",
+        "description": (
+            "Look at the entire page on the tablet, not only the words just "
+            "written: everything above and below them, and the replies you "
+            "wrote earlier in this conversation, as it all stood the moment "
+            "the pen came up. Call this when what they wrote refers to "
+            "something not in the cropped photograph -- 'this', 'the one "
+            "above', an arrow, a correction to an earlier line, a diagram "
+            "they are adding to. Do not call it for writing that stands on "
+            "its own."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+}
+
 CLOSING = {
     "pause": (
         "Answer what the page says. Anything heard in the room is only "
@@ -83,6 +130,9 @@ class Answer:
     session_id: str = ""
     cost_usd: float | None = None
     duration_ms: int | None = None
+    # Whether the model asked to see the whole page. Carried back so the
+    # timeline can say it happened; the store belongs to another thread.
+    looked: bool = False
     # The `REMEMBER:` lines, carried back rather than written where they were
     # found. A backend runs in a worker thread and keeping a line writes an
     # event; the store's connection belongs to the loop's thread, so the
@@ -110,6 +160,9 @@ class Question:
 
     trigger: str = "pause"
     image: Path | None = None
+    # The whole page, photographed before the eraser ran. Not attached to the
+    # turn: offered as `look_at_page`, and read only if the model asks.
+    page: Path | None = None
     heard: list = None
     typed: list = None
 
@@ -120,6 +173,8 @@ class Question:
         goes in; nothing here has to describe it.
         """
         lines = [PAGE_ATTACHED if self.image is not None else NO_PAGE]
+        if self.page is not None:
+            lines.append(WHOLE_PAGE)
         for when, text in self.heard or []:
             lines.append(f"Heard in the room, {ago(when)}: \"{text}\"")
         for when, text in self.typed or []:

@@ -71,9 +71,9 @@ streams itself.
 | `speech` | the voice server | `text`, `path` to the clip |
 | `note` | the page, or the loop | `text`; `meta.remember` when the diary kept it |
 | `reply` | the loop | `text`, `meta.intent` when a send caused it |
-| `tool` | the loop | `meta.doing`: opened, thinking, writing, forgetting, cleared, waiting for the tablet, back on the tablet |
+| `tool` | the loop | `meta.doing`: opened, thinking, writing, forgetting, cleared, waiting for the tablet, back on the tablet, looking at the whole page |
 | `error` | either | `text` |
-| `shot` | nothing yet | reserved for a screenshot |
+| `shot` | the loop | `path` to the photograph of the whole page taken before the eraser ran, and the `dur_ms` it took |
 
 **`strokes`** — geometry, kept out of the timeline because it is bulk and
 nothing but a renderer wants it. Points are little-endian int16 pairs; the

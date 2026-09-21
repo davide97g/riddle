@@ -141,3 +141,8 @@ loudly rather than handing back a picture of nothing.
 
 This reads another process's address space, so it has its own gate:
 `--yes` or `RIDDLE_ALLOW_SNAP=1`, separate from the drawing one.
+
+The loop answers to that same switch rather than a second one. With
+`RIDDLE_ALLOW_SNAP=1` it photographs the whole page once per turn, between
+the pause and the eraser, and offers it to the model as `look_at_page`; see
+[loop.md](loop.md). Without it, the loop never reads the screen.

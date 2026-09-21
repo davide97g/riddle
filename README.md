@@ -107,7 +107,9 @@ Every command that can leave a mark asks first: it needs `--yes`, or a
 standing `RIDDLE_ALLOW_DRAW=1`. The loop is the deliberate exception, because
 starting it *is* the consent; it says which notebook it means when it starts.
 Reading the tablet's screen is a separate gate, `RIDDLE_ALLOW_SNAP`, because
-it reads another process's memory rather than writing to a page.
+it reads another process's memory rather than writing to a page. The loop
+answers to that one too: with it set, each turn is photographed whole and the
+model may ask to see it.
 
 Take a backup first: `./riddle backup create`.
 
@@ -115,9 +117,11 @@ Take a backup first: `./riddle backup create`.
 
 Photographs of your handwriting, recordings of the room, transcripts, and
 what each turn cost — all under `var/`, which is gitignored whole. One company
-sees a turn: the photograph of the page and the transcript window go to
+sees a turn: the photograph of what you wrote and the transcript window go to
 OpenAI, attached to the same call that writes the reply. There is no second
-model, and the diary has no tools — it searches nothing.
+model, and the diary has one tool — `look_at_page`, which hands it a
+photograph of your whole page, and only if you set `RIDDLE_ALLOW_SNAP=1`. It
+searches nothing.
 
 Anything said near the microphone inside a turn's window becomes part of the
 question, including other people in the room.
