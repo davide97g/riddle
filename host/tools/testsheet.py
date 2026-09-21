@@ -95,8 +95,9 @@ if __name__ == "__main__":
 
     device = Device()
     time.sleep(1.5)
+    device.select("pen")
     start = time.monotonic()
-    device.draw(strokes, pressure=3000, step_ms=2)
+    device.draw(strokes, pressure=3000, step_ms=6)
     device.sync()
     elapsed = time.monotonic() - start
     print(f"drawn in {elapsed:.1f}s")

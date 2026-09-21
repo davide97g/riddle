@@ -144,7 +144,11 @@ class Session:
             baseline=baseline,
             max_width=max_width,
         )
-        self.device.draw(ink, pressure=self.pressure, step_ms=3)
+        # An injected stroke becomes whatever tool xochitl has active, so a
+        # page of handwriting turns into a page of lasso selections if the
+        # toolbar was left on the selection tool. Press the pen first.
+        self.device.select("pen")
+        self.device.draw(ink, pressure=self.pressure, step_ms=6)
         self.device.sync()
 
     def _ask(self, image: Path) -> str | None:

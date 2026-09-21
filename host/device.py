@@ -113,12 +113,17 @@ class Device:
         self,
         strokes: list[list[tuple[float, float]]],
         pressure: int = 2400,
-        step_ms: int = 4,
+        step_ms: int = 6,
         eraser: bool = False,
         spacing: float = 3.0,
-        settle_ms: int = 12,
+        settle_ms: int = 25,
     ) -> None:
-        """Replay strokes onto the page as pen or eraser input."""
+        """Replay strokes onto the page as pen or eraser input.
+
+        The step and settle defaults were read off a ladder on firmware 3.28:
+        anything faster and xochitl drops samples, which shows up as letters
+        broken mid-stroke rather than as anything you would call lag.
+        """
         self._send("TOOL RUBBER" if eraser else "TOOL PEN")
         for stroke in strokes:
             points = _resample(stroke, spacing)
