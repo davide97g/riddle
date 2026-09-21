@@ -26,3 +26,22 @@ __pycache__/
 .riddle.pid
 riddle.log
 memories.txt
+
+# The diary's memory: every stroke, and every word said near the microphone.
+riddle.db*
+
+# Utterances captured from the browser microphone, kept only long enough to
+# re-check a transcript. A recording of your room, like captures/.
+audio/
+
+# The speech model, fetched once by hand.
+models/
+
+# The page you speak into: deps and build output. bun.lock is committed.
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Background runners
+.voice.pid
+voice.log
