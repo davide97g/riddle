@@ -27,7 +27,16 @@ export type DiaryEvent = {
 
 /** Whether the half that owns the pen is running. Without it the page
  *  promises an answer that nothing is there to give. */
-export type DiaryPresence = { present: boolean; ago_ms: number | null }
+export type DiaryPresence = {
+  present: boolean
+  ago_ms: number | null
+  /** who runs that half on the server: a systemd user unit, or the server
+   *  itself with a pidfile. A stop under systemd is a request to a
+   *  supervisor, which is a weaker promise than a kill. */
+  manager: 'systemd' | 'here'
+  /** a start or stop asked from a page is still running */
+  busy: boolean
+}
 
 export type ServerMessage =
   | ({ type: 'event' } & DiaryEvent)
@@ -42,6 +51,9 @@ export type ServerMessage =
   /** a send was recorded, and this is its id. the reply carries the same id
    *  in meta.intent, which is how an optimistic row settles */
   | { type: 'intent.ok'; id: number; at_ms: number }
+  /** the loop came, went, or is being started or stopped. Sent on every
+   *  change, so a page that was open when it died learns without a reload */
+  | ({ type: 'diary' } & DiaryPresence)
   | { type: 'pong'; t: number }
   /** the gate opened or closed: somebody is speaking, or has stopped */
   | { type: 'hearing'; on: boolean }
@@ -59,6 +71,11 @@ export type ClientMessage =
    *  conversation and deletes this session's rows. Nothing is acknowledged;
    *  the `tool` row with `meta.doing === 'cleared'` is what says it happened */
   | { type: 'clear' }
+  /** bring the half that owns the pen up, or take it down. Not acknowledged:
+   *  starting it is a process and then a heartbeat, and `diary` is what says
+   *  it arrived. Only a failure comes back, as `error` */
+  | { type: 'diary.start' }
+  | { type: 'diary.stop' }
 
 /** A row on screen: either something the server told us, or something we have
  *  said but not yet seen come back. */

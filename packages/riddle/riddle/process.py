@@ -26,6 +26,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from riddle import paths
@@ -50,6 +51,78 @@ class Service:
 DIARY = Service("diary", "riddle.apps.diary", "listening", 3.0)
 VOICE = Service("voice", "riddle.apps.voice", "up", 2.0)
 SERVICES = {s.name: s for s in (DIARY, VOICE)}
+
+
+def unit(service: Service) -> str:
+    """The systemd user unit that runs this half on the box."""
+    return f"riddle-{service.name}"
+
+
+def _systemctl(*argv: str, timeout: float = 20.0):
+    try:
+        return subprocess.run(
+            ["systemctl", "--user", *argv],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+@lru_cache(maxsize=None)
+def manager(name: str) -> str:
+    """Who is expected to run this half *here*: `systemd`, or `here`.
+
+    On the box both halves are user units. A start that spawned a child
+    beside the unit would put two ssh pipes into one digitizer, and a stop
+    that went looking for a pidfile would find none and report success over
+    a service that is still answering. So anything that wants to bring a
+    half up or down asks this first, and then asks whoever actually holds it
+    -- which is what `elsewhere()` has always said to do.
+
+    Memoised: a unit file does not appear halfway through a process, and the
+    page asks about the loop four times a second.
+    """
+    done = _systemctl("show", f"riddle-{name}", "--property=LoadState", "--value")
+    if done is not None and done.returncode == 0 and done.stdout.strip() == "loaded":
+        return "systemd"
+    return "here"
+
+
+def begin(service: Service) -> tuple[int, str]:
+    """Bring a half up the way this machine runs it. `(code, what to say)`.
+
+    The pair of this and `end` is what the page drives. They return a line
+    rather than printing one, because on the other end of them is a browser
+    and not a terminal.
+    """
+    if manager(service.name) == "systemd":
+        done = _systemctl("start", unit(service), timeout=60.0)
+        if done is None:
+            return 1, "systemctl is not answering"
+        if done.returncode:
+            return done.returncode, done.stderr.strip() or f"{unit(service)} did not start"
+        return 0, f"asked systemd for {unit(service)}"
+    code = start(service)
+    if code:
+        return code, tail(service.logfile, 8) or "it did not come up"
+    return 0, f"{service.verb} (pid {alive(service)})"
+
+
+def end(service: Service, *, timeout: float = 6.0) -> tuple[int, str]:
+    """Take a half down the way this machine runs it. `(code, what to say)`."""
+    if manager(service.name) == "systemd":
+        done = _systemctl("stop", unit(service), timeout=max(30.0, timeout))
+        if done is None:
+            return 1, "systemctl is not answering"
+        if done.returncode:
+            return done.returncode, done.stderr.strip() or f"{unit(service)} did not stop"
+        # The unit's own SIGTERM handler clears the beat on the way out, but
+        # a kill after the timeout does not, and the next start would then
+        # refuse for the rest of the stale window.
+        forget_heartbeat(service)
+        return 0, f"asked systemd to stop {unit(service)}"
+    stop(service, timeout=timeout)
+    return 0, "stopped"
 
 
 def _read_pidfile(service: Service) -> int | None:

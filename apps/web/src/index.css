@@ -544,6 +544,19 @@
     opacity: 0.6;
 }
 
+/* Asked to open or shut and not there yet. The whole book breathes rather
+   than a spinner appearing next to it: what is pending is this object's own
+   state, and the wait is a heartbeat in a file, not a request in flight. */
+.diary[data-busy] {
+    animation: diary-wait 1.6s ease-in-out infinite;
+}
+
+@keyframes diary-wait {
+    50% {
+        opacity: 0.4;
+    }
+}
+
 /* Past ninety degrees you are looking at the inside of the cover, which is
    paper. */
 .diary-face-back {

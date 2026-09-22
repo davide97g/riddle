@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Composer } from '@/components/Composer'
 import { ConnectionBadge } from '@/components/ConnectionBadge'
-import { DiaryIcon } from '@/components/DiaryIcon'
+import { DiaryButton } from '@/components/DiaryButton'
 import { EraseButton } from '@/components/EraseButton'
 import { Splash } from '@/components/Splash'
 import { Timeline } from '@/components/Timeline'
@@ -29,7 +29,7 @@ export default function App() {
           <span className="sr-only">riddle</span>
         </h1>
         <div className="flex items-center gap-2">
-          <DiaryIcon open={state.diary.present} />
+          <DiaryButton />
           <ConnectionBadge />
           <EraseButton />
         </div>
@@ -37,7 +37,8 @@ export default function App() {
       {state.conn === 'closed' && (
         <Alert className="drop-in rounded-none border-x-0 border-t-0">
           <AlertDescription>
-            Not connected to the diary. Is <code>./voice.sh start</code> running?
+            Not connected to the diary. Is <code>riddle voice start</code>{' '}
+            running?
           </AlertDescription>
         </Alert>
       )}

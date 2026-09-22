@@ -36,7 +36,7 @@ export const initial: State = {
   serverNowMs: null,
   greetedAt: null,
   listening: false,
-  diary: { present: false, ago_ms: null },
+  diary: { present: false, ago_ms: null, manager: 'here', busy: false },
   conn: 'connecting',
   draft: '',
   hearing: false,
@@ -140,6 +140,10 @@ export function reduce(state: State, action: Action): State {
           listening: msg.listening,
           diary: msg.diary ?? state.diary,
         }
+      }
+      if (msg.type === 'diary') {
+        const { type: _ignored, ...diary } = msg
+        return { ...state, diary }
       }
       if (msg.type === 'hearing') {
         return { ...state, hearing: msg.on }

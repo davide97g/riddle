@@ -72,7 +72,7 @@ is routed.
 | Route | Returns |
 |---|---|
 | `GET /api/health` | `{ok, session}` |
-| `GET /api/state` | `{session, started_ms, now_ms, listening, diary:{present, ago_ms}}` |
+| `GET /api/state` | `{session, started_ms, now_ms, listening, diary:{present, ago_ms, manager, busy}}` |
 | `GET /api/events?since=&limit=` | `{events:[DiaryEvent]}`, limit capped at 500 |
 | `GET /api/captures/<name>` | a png from `var/captures`, path-traversal checked on the resolved path |
 | `GET /api/intent/<id>` | `{id, state, result}` |
@@ -108,6 +108,7 @@ Client to server:
 | `note {text}` | records a typed note |
 | `send {at_ms, draft}` | leaves a `send` intent, answered with `intent.ok` |
 | `clear {}` | leaves a `clear` intent: the diary rubs its ink off the page, forgets the conversation and deletes this session. Not acknowledged; the `tool` row with `meta.doing` `cleared` is what says it happened |
+| `diary.start {}` / `diary.stop {}` | brings the half that owns the pen up or down. Not acknowledged; a `diary` message is what says it arrived, and only a failure comes back, as `error` |
 
 Server to client:
 
@@ -116,10 +117,18 @@ Server to client:
 | `hello.ok {session, started_ms, now_ms, listening, diary}` | the greeting |
 | `event {...DiaryEvent}` | one row of the timeline |
 | `pong {t}` | |
+| `diary {present, ago_ms, manager, busy}` | the half that owns the pen came, went, or is being started or stopped. Sent on every change |
 | `hearing {on}` | the energy gate opened or closed |
 | `pending {clip, on}` | a clip is with the speech model |
 | `intent.ok {id, at_ms}` | a send was recorded, and this is its id |
 | `error {message}` | |
+
+`manager` is `systemd` where that half is a user unit and `here` where this
+process would start it itself — the page shows it because a stop asked of a
+supervisor is a different promise from a signal, and because a child spawned
+beside a running unit would be a second ssh pipe into one digitizer. Which of
+the two it is, is `riddle.process.manager`'s to decide; the server never
+constructs a `Device` either way.
 
 Reconnecting is `hello {since: seq}` and nothing else. There is no other
 resync path and there does not need to be one.

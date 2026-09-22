@@ -10,6 +10,8 @@ type Diary = {
   note: (text: string) => void
   send: () => void
   clear: () => void
+  /** bring the half that owns the pen up, or take it down */
+  runDiary: (up: boolean) => void
 }
 
 const Context = createContext<Diary | null>(null)
@@ -60,8 +62,18 @@ export function RiddleProvider({ children }: { children: ReactNode }) {
     say({ type: 'clear' })
   }, [say])
 
+  const runDiary = useCallback(
+    (up: boolean) => {
+      // Nothing optimistic. The server says `busy` straight back and `diary`
+      // again when it is done, and a book that swung open before the loop
+      // was up would be the page lying about the one thing it must not.
+      say({ type: up ? 'diary.start' : 'diary.stop' })
+    },
+    [say],
+  )
+
   return (
-    <Context.Provider value={{ state, setDraft, note, send, clear }}>
+    <Context.Provider value={{ state, setDraft, note, send, clear, runDiary }}>
       {children}
     </Context.Provider>
   )

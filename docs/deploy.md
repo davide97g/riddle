@@ -37,6 +37,15 @@ journalctl --user -u riddle-diary -f
 systemctl --user restart riddle-diary
 ```
 
+The page can ask for the loop itself — the book in its header is the switch
+for it — and on the box that goes through `systemctl --user`, not through a
+pidfile. `riddle.process.manager` is what decides which, by asking systemd
+whether the unit is loaded; a child spawned beside a running unit would be the
+second ssh pipe into one digitizer, and a stop that went looking for a pidfile
+would find none and report success over a service that is still answering.
+The voice half is deliberately not offered: stopping it from the page it
+serves would take the button with it.
+
 The diary unit is `KillMode=control-group` on purpose: it owns an ssh
 subprocess holding the agent's stdin, and killing only the python leaves that
 ssh holding the digitizer, so the next start cannot have it. Same reasoning as

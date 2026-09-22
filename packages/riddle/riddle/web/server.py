@@ -16,7 +16,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from riddle import config
+from riddle import config, process
 from riddle.web import auth, wsock
 
 POLL_S = 0.25  # how often the store is tailed for anything new
@@ -37,6 +37,11 @@ class Hub:
         self.store = store
         self.control: set[wsock.Socket] = set()
         self.seen = 0
+        # What the pages have been told about the half that owns the pen, and
+        # the callable that says what is true. Set by the server; `None` until
+        # then, so the first tick always says it once.
+        self.diary_was: bool | None = None
+        self.diary_now = None
 
     async def say(self, message: dict) -> None:
         """One message to every open page, and no page can hold up another.
@@ -88,8 +93,29 @@ class Hub:
                 for event in self.store.since_id(self.seen):
                     self.seen = event["id"]
                     await self.say({"type": "event", **event})
+                await self.presence()
             except Exception as exc:  # the loop may be mid-write, or gone
                 print(f"tail: {exc!r}", flush=True)
+
+    async def presence(self) -> None:
+        """Say when the half that owns the pen comes or goes.
+
+        The greeting carries it, and until there was a button for it that was
+        enough: a page that watched the loop die simply told you it would
+        answer until you reloaded. Now the button's own outcome arrives this
+        way -- starting the loop is a subprocess and a heartbeat later, not a
+        reply -- so the same poll that delivers events delivers this.
+
+        Only on a change. It is a broadcast, and the answer is the same four
+        times a second.
+        """
+        if self.diary_now is None:
+            return
+        state = self.diary_now()
+        if state["present"] == self.diary_was:
+            return
+        self.diary_was = state["present"]
+        await self.say({"type": "diary", **state})
 
 
 class Server:
@@ -98,7 +124,12 @@ class Server:
         self.root = root
         self.web_dir = web_dir
         self.hub = Hub(store)
+        self.hub.diary_now = self.diary
         self.ears = ears
+        # A start or stop asked from a page, still running. One at a time:
+        # two of them racing would be two ssh pipes, or a stop overtaking the
+        # start it was meant to follow.
+        self.working = False
         # Off unless a password is set, which is the loopback case: reaching
         # the port already means reaching the machine.
         self.gate = auth.Gate(config.get().web_password)
@@ -264,13 +295,21 @@ class Server:
             self.hub.control.discard(sock)
 
     def diary(self) -> dict:
-        """Whether the half that owns the pen is running.
+        """Whether the half that owns the pen is running, and who runs it.
 
-        Without this the page promises that Send will be answered even when
-        nothing is listening, and the intent simply waits.
+        Without the first the page promises that Send will be answered even
+        when nothing is listening, and the intent simply waits. The second is
+        what the page's start and stop go through, and it is worth showing:
+        under systemd a stop is a request to a supervisor that may bring it
+        straight back, and that is a different promise from a kill.
         """
         ago_ms = self.store.present("loop")
-        return {"present": ago_ms is not None, "ago_ms": ago_ms}
+        return {
+            "present": ago_ms is not None,
+            "ago_ms": ago_ms,
+            "manager": process.manager("diary"),
+            "busy": self.working,
+        }
 
     def state(self) -> dict:
         return {
@@ -302,6 +341,8 @@ class Server:
             # ink is off. Like a note, this is left and not waited on.
             self.store.push_intent("web", "clear")
             return
+        if kind in ("diary.start", "diary.stop"):
+            return await self.half(sock, kind == "diary.start")
         if kind == "send":
             at_ms = int(msg.get("at_ms", self.store.now_ms()))
             intent = self.store.push_intent(
@@ -314,6 +355,53 @@ class Server:
                 json.dumps({"type": "intent.ok", "id": intent, "at_ms": at_ms})
             )
         await sock.send(json.dumps({"type": "error", "message": f"unknown {kind!r}"}))
+
+    async def half(self, sock: wsock.Socket, up: bool) -> None:
+        """Start or stop the loop, from the page it serves.
+
+        The page could already ask the loop to draw and to rub the page out.
+        What it could not ask for was the loop itself, which is the one thing
+        you need when it is down and you are two rooms or one tunnel away.
+
+        This still constructs no `Device`, and that is not a technicality:
+        what it starts is a child in its own process group, or a unit, and
+        the ssh pipe belongs to that, never to this process. Which of the two
+        is `process.manager`'s to know -- a child spawned beside a running
+        unit would be the second pipe into one digitizer.
+
+        The loop only, never this half. Stopping the voice server from the
+        page it serves would take away the button that starts it again.
+
+        The outcome does not come back here. Starting is a subprocess and
+        then a heartbeat, seconds later; the page learns it the same way it
+        learns everything else, from the store being tailed. Only a failure
+        is answered, because nothing else will ever mention it.
+        """
+        import asyncio
+
+        if self.working:
+            return await sock.send(
+                json.dumps({"type": "error", "message": "already starting or stopping it"})
+            )
+        self.working = True
+        await self.hub.say({"type": "diary", **self.diary()})
+        try:
+            # In a thread: `begin` waits out the child's settle window and
+            # `end` waits for it to die, and neither may hold up the coroutine
+            # that delivers events. Nothing in there touches this store --
+            # the heartbeat it clears is its own connection, opened and closed
+            # in that thread.
+            code, said = await asyncio.to_thread(
+                process.begin if up else process.end, process.DIARY
+            )
+        except Exception as exc:  # noqa: BLE001 - a button may not kill the feed
+            code, said = 1, repr(exc)
+        finally:
+            self.working = False
+        print(f"page asked the diary to {'start' if up else 'stop'}: {said}", flush=True)
+        if code:
+            await sock.send(json.dumps({"type": "error", "message": said}))
+        await self.hub.say({"type": "diary", **self.diary()})
 
     async def audio(self, sock: wsock.Socket, query: dict) -> None:
         """Take PCM until the page stops sending it.
