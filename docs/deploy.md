@@ -54,10 +54,17 @@ ssh holding the digitizer, so the next start cannot have it. Same reasoning as
 ### Updating it
 
 ```sh
-ssh homelab 'cd ~/riddle && git pull && .venv/bin/python -m pip -q install -e packages/riddle'
+ssh homelab 'cd ~/riddle && git pull --ff-only'
 ssh homelab 'cd ~/riddle/apps/web && ~/.bun/bin/bun run build'   # only if the client changed
 ssh homelab 'systemctl --user restart riddle-voice riddle-diary'
 ```
+
+No reinstall in there, and that used to be a `pip install -e` that quietly did
+nothing: the venv is `uv`'s and has no `pip` in it. It does not need one. The
+install is editable, so a pull is the deploy for anything under
+`packages/riddle`. A new dependency or a new entry point is the exception, and
+that is `uv pip install -e packages/riddle` with `~/.local/bin/uv`, which a
+non-login `ssh homelab` does not have on its PATH.
 
 There is no CI for this one. `riddle doctor --quick` on the box is the check
 that it is still whole.
