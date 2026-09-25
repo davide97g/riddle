@@ -28,7 +28,8 @@ machine, both in `localStorage`:
   a device, not a recording.
 - `riddle.snapshots`, up to ten **photographs of your whole page**, taken
   with the Snapshot button on `/live`: full-size pngs, exactly the frames the
-  live view was sent. The server never learns a snapshot was taken. Each
+  live view was sent, with the model's reading of each one you pressed
+  Understand on. The server never learns a snapshot was taken. Each
   one can be deleted from the shelf; anyone who can open that browser can
   see them until then.
 
@@ -62,15 +63,18 @@ One company, and it is worth knowing what it sees.
   not rubbed out. The photograph is taken whether or not the model asks, and
   is kept on disk either way; what the tool decides is whether it is sent.
   Without that variable set, the diary never reads the screen at all.
-- **That is the whole list.** There is one model and one tool, and the tool
-  only hands back a picture of your own page: the diary searches nothing,
-  fetches nothing, and cannot see anything on this machine that a turn did
-  not hand it.
+- **The diary is one model with one tool**, and the tool only hands back a
+  picture of your own page: it searches nothing, fetches nothing, and cannot
+  see anything on this machine that a turn did not hand it. The second
+  model, below, is only ever asked by a button.
 - **The live view sends your whole page to whoever opens it**, about once
   a second, as long as they keep it open. Frames are held in memory and
   never written to disk. Behind the tunnel that is to anybody with the
   password, so the password is guarding your notebook as well as your pen.
   Without `RIDDLE_ALLOW_SNAP=1` it is refused.
+- **A snapshot you press Understand on goes to OpenAI**, the whole page,
+  to `RIDDLE_UNDERSTAND_MODEL`, and only then. Not kept on this machine; the
+  reading comes back to the browser that asked.
 - **A document put on the tablet goes to the tablet**, and to nowhere on
   this machine: it is packed in memory and piped into xochitl's store. From
   there it is the tablet's like any other document -- including to

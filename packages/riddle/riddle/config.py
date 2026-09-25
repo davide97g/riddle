@@ -80,6 +80,12 @@ SETTINGS: tuple[Setting, ...] = (
             "diary",
             "Where that API lives. Anything OpenAI-compatible that takes an "
             "image works, which is how a local model would be dropped in."),
+    Setting("RIDDLE_UNDERSTAND_MODEL", "understand_model", str, "gpt-6-luna",
+            "diary",
+            "Which model reads a snapshot on the live page when you press "
+            "Understand. The one that reads handwriting best rather than the "
+            "quickest: somebody pressed a button and can wait a few seconds. "
+            "Same key and url as the diary's."),
     Setting("RIDDLE_MAX_WORDS", "max_words", int, 22, "diary",
             "How long a reply may be. A page is small and the pen is slow."),
 
@@ -177,6 +183,7 @@ class Config:
     openai_model: str
     openai_key: str
     openai_url: str
+    understand_model: str
     max_words: int
     font_body: str
     font_accent: str

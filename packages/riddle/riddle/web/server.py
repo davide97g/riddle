@@ -249,6 +249,9 @@ class Server:
         if method == "POST" and path == "/api/library":
             return await self.library(writer, query, body)
 
+        if method == "POST" and path == "/api/understand":
+            return await self.understand(writer, body)
+
         if path.startswith("/api/intent/"):
             found = self.store.intent(int(path.rsplit("/", 1)[1] or 0))
             if found is None:
@@ -295,6 +298,32 @@ class Server:
             "id": uid, "name": doc.name, "kind": doc.kind,
             "pages": doc.pages, "bytes": len(doc.body),
         })
+
+    async def understand(self, writer, body: bytes) -> None:
+        """What the model makes of one page: the request body, a png.
+
+        The page sends a frame it already has -- a snapshot, current or old
+        -- so nothing is read off the tablet for this, and the image is not
+        kept here. It goes to OpenAI, which is the whole point, and only
+        because somebody pressed the button.
+        """
+        import asyncio
+
+        from riddle.mind.understand import understand
+
+        if body[:8] != b"\x89PNG\r\n\x1a\n":
+            return _json(writer, {"error": "expected a png"}, status="400 Bad Request")
+        cfg = config.get()
+        try:
+            read = await asyncio.to_thread(
+                understand, body, key=cfg.openai_key,
+                model=cfg.understand_model, url=cfg.openai_url,
+            )
+        except Exception as exc:  # noqa: BLE001 - the model's answer, passed on
+            print(f"understand: {exc}", flush=True)
+            return _json(writer, {"error": str(exc)}, status="502 Bad Gateway")
+        print(f"understand: {read.get('title')!r} in {read['took_ms']}ms ({read['model']})", flush=True)
+        return _json(writer, read)
 
     def page(self, writer, path: str) -> None:
         """Serve the built app, falling back to index so routing works."""

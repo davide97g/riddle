@@ -163,7 +163,18 @@ opens full size and downloads or copies on its own, as the tablet sent it —
 1404x1872, white paper, black ink — whatever the dark theme did to the
 preview. Nothing is read off the tablet again for it, and the server never
 hears about it. A browser whose storage is full keeps as many of the newest
-as fit and says so. Safari and Chrome copy images; a browser that cannot
+as fit and says so.
+
+**Understand** asks a model what is on the page: the writing as text, what
+the drawing is, which box an arrow points at, what the little icons beside
+items seem to mean. Next to Snapshot it takes one and opens it with the
+reading arriving beside it; on any snapshot on the shelf, however old, it
+reads that one as it was when it was taken. The reading is kept with the
+snapshot, so opening it again costs nothing, and asking again replaces it.
+It is `RIDDLE_UNDERSTAND_MODEL`, `gpt-6-luna` by default, with the diary's
+key -- one call with a strict json schema, a few seconds, no history. It
+does not need the diary, and it never reads the tablet: the snapshot the
+page already has is what is sent. Safari and Chrome copy images; a browser that cannot
 still keeps the snapshot and says it did not copy. Only frames that changed are sent, so the line above the page says when it
 last changed rather than when it was last read. A frame is a torn read:
 the stroke being drawn as it is taken can come out half finished, and is

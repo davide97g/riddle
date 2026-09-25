@@ -121,10 +121,11 @@ Take a backup first: `./riddle backup create`.
 Photographs of your handwriting, recordings of the room, transcripts, and
 what each turn cost — all under `var/`, which is gitignored whole. One company
 sees a turn: the photograph of what you wrote and the transcript window go to
-OpenAI, attached to the same call that writes the reply. There is no second
-model, and the diary has one tool — `look_at_page`, which hands it a
-photograph of your whole page, and only if you set `RIDDLE_ALLOW_SNAP=1`. It
-searches nothing.
+OpenAI, attached to the same call that writes the reply. The diary has one
+tool — `look_at_page`, which hands it a photograph of your whole page, and
+only if you set `RIDDLE_ALLOW_SNAP=1`. It searches nothing. The only other
+call is Understand on the live page, which sends one snapshot to a second
+model when you press it.
 
 Anything said near the microphone inside a turn's window becomes part of the
 question, including other people in the room.

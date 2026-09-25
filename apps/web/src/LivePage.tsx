@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { LiveScreen } from '@/components/LiveScreen'
 import { SendToTablet } from '@/components/SendToTablet'
-import { SnapButton, SnapshotShelf } from '@/components/Snapshots'
+import { SnapButton, SnapshotShelf, UnderstandButton } from '@/components/Snapshots'
 import { Wordmark } from '@/components/Wordmark'
 import { Button } from '@/components/ui/button'
 import { useLiveScreen } from '@/hooks/useLiveScreen'
@@ -17,7 +17,9 @@ import { useSnapshots } from '@/hooks/useSnapshots'
  *  tablet is a document for its library, which never goes near the pen. */
 export function LivePage() {
   const live = useLiveScreen()
-  const { snaps, kept, take, remove } = useSnapshots()
+  const { snaps, kept, reading, take, remove, understand } = useSnapshots()
+  const [open, setOpen] = useState<string | null>(null)
+  const act = { remove, understand, reading, open, setOpen }
 
   useEffect(() => {
     const was = document.title
@@ -49,8 +51,21 @@ export function LivePage() {
         </div>
       </header>
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <LiveScreen live={live} action={<SnapButton frame={live.blob} take={take} />} />
-        <SnapshotShelf snaps={snaps} kept={kept} remove={remove} />
+        <LiveScreen
+          live={live}
+          action={
+            <>
+              <UnderstandButton
+                frame={live.blob}
+                take={take}
+                understand={understand}
+                setOpen={setOpen}
+              />
+              <SnapButton frame={live.blob} take={take} />
+            </>
+          }
+        />
+        <SnapshotShelf snaps={snaps} kept={kept} act={act} />
       </main>
     </div>
   )

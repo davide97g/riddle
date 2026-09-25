@@ -57,7 +57,7 @@ Everything Python is one installable package, `packages/riddle/riddle`.
 |---|---|
 | `riddle.device` | the ssh transport. `agent` (the pipe to `riddled`, and the only thing that injects), `ssh` (options and remote paths), `taps` (recorded toolbar presses), `screen` (the framebuffer out of xochitl's memory), `library` (a document into xochitl's store), `notebook`, `pages` (noticing a page turn) |
 | `riddle.ink` | marks on a page. `geometry` (the only module that knows the digitizer is rotated), `hershey` and `skeleton` (the two ways to turn text into pen paths, interchangeable above `style`), `style`, `render`, `draw`, `diagram`, `page`, `image`, `lineart` |
-| `riddle.mind` | who answers. `openai` (one http call per turn with the new writing attached to it, and a second only if the model calls `look_at_page` for the rest of the page), `persona` (the words, which outlived the two models that said them before), `memory` (the lines that survive a reset) |
+| `riddle.mind` | who answers. `openai` (one http call per turn with the new writing attached to it, and a second only if the model calls `look_at_page` for the rest of the page), `persona` (the words, which outlived the two models that said them before), `understand` (a page read out and explained for a person, for the live page), `memory` (the lines that survive a reset) |
 | `riddle.store` | `db` and `schema.sql` |
 | `riddle.voice` | `ears`: the energy gate and the speech model |
 | `riddle.web` | `server` (http and websockets), `wsock` (enough RFC 6455 for one browser) and `live` (the screen read on a loop, for a page watching the tablet) |
