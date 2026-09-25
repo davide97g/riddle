@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useReducer, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useReducer, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { useRiddleSocket } from '@/hooks/useRiddleSocket'
 import { initial, nowMs, reduce } from '@/state/reducer'
@@ -12,6 +12,29 @@ type Diary = {
   clear: () => void
   /** bring the half that owns the pen up, or take it down */
   runDiary: (up: boolean) => void
+  /** fade the ink and answer after a pause, or leave the page alone */
+  setVanish: (on: boolean) => void
+}
+
+const VANISH = 'riddle.vanish'
+
+/** This browser's word on the switch, from the last time it was turned. */
+function remembered(): boolean | null {
+  try {
+    const kept = localStorage.getItem(VANISH)
+    return kept === null ? null : kept === '1'
+  } catch {
+    // Private browsing throws rather than returning null.
+    return null
+  }
+}
+
+function remember(on: boolean) {
+  try {
+    localStorage.setItem(VANISH, on ? '1' : '0')
+  } catch {
+    // A switch that cannot be remembered here is still kept by the server.
+  }
 }
 
 const Context = createContext<Diary | null>(null)
@@ -72,8 +95,32 @@ export function RiddleProvider({ children }: { children: ReactNode }) {
     [say],
   )
 
+  const setVanish = useCallback(
+    (on: boolean) => {
+      // Optimistic, unlike the diary's own switch: this is a setting, not a
+      // process, and the server's echo says the same thing a moment later.
+      remember(on)
+      dispatch({ type: 'server', msg: { type: 'vanish', on } })
+      say({ type: 'vanish', on })
+    },
+    [say],
+  )
+
+  // The switch lives in the store, because the loop is what obeys it, and in
+  // this browser, so it survives the store being new. A server that has never
+  // been told takes this browser's word; one that has is newer than it, and
+  // is remembered here.
+  useEffect(() => {
+    if (state.conn !== 'open' || state.vanishKnown) return
+    const mine = remembered()
+    if (mine !== null) say({ type: 'vanish', on: mine })
+  }, [state.conn, state.vanishKnown, say])
+  useEffect(() => {
+    if (state.vanishKnown) remember(state.vanish)
+  }, [state.vanish, state.vanishKnown])
+
   return (
-    <Context.Provider value={{ state, setDraft, note, send, clear, runDiary }}>
+    <Context.Provider value={{ state, setDraft, note, send, clear, runDiary, setVanish }}>
       {children}
     </Context.Provider>
   )

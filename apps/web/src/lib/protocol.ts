@@ -49,6 +49,9 @@ export type ServerMessage =
       /** whether this server will stream the tablet's screen on /ws/live,
        *  which is RIDDLE_ALLOW_SNAP and nothing else */
       live: boolean
+      /** whether the diary takes the ink off and answers after a pause.
+       *  null until any page has set it, which the diary reads as yes */
+      vanish: boolean | null
       diary: DiaryPresence
     }
   /** a send was recorded, and this is its id. the reply carries the same id
@@ -58,6 +61,8 @@ export type ServerMessage =
    *  change, so a page that was open when it died learns without a reload */
   | ({ type: 'diary' } & DiaryPresence)
   | { type: 'pong'; t: number }
+  /** the switch was turned, from this page or another */
+  | { type: 'vanish'; on: boolean }
   /** the gate opened or closed: somebody is speaking, or has stopped */
   | { type: 'hearing'; on: boolean }
   /** a sentence is being read. there is no partial text to show, because the
@@ -77,6 +82,8 @@ export type ClientMessage =
   /** bring the half that owns the pen up, or take it down. Not acknowledged:
    *  starting it is a process and then a heartbeat, and `diary` is what says
    *  it arrived. Only a failure comes back, as `error` */
+  /** the switch on the main page: fade and answer, or leave the page alone */
+  | { type: 'vanish'; on: boolean }
   | { type: 'diary.start' }
   | { type: 'diary.stop' }
 

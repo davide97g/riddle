@@ -31,6 +31,7 @@ from riddle.device.ssh import INTERACTIVE
 FRAME_S = 15.0  # a frame slower than this is a dead link, not a slow one
 RETRY_S = 5.0   # between dials while the tablet does not answer
 SEND_S = 5.0    # how long one page may take a frame before it is dropped
+BEAT_S = 5.0    # how often the store hears that somebody is still watching
 CHUNK = 1 << 16
 
 
@@ -44,9 +45,14 @@ def encode(raw: bytes) -> bytes:
 class Live:
     """Everyone watching the page, and the one connection that feeds them."""
 
-    def __init__(self, host: str, every_ms: int) -> None:
+    def __init__(self, host: str, every_ms: int, on_watch=None) -> None:
         self.host = host
         self.every = every_ms / 1000
+        # Told True every few seconds while anybody is watching and False
+        # when the last one leaves: the loop keeps its hands off the page
+        # for as long as it keeps hearing it. Called on the event loop, so it
+        # may touch the store.
+        self.on_watch = on_watch or (lambda on: None)
         self.viewers: set = set()
         # The newest frame, so a page that arrives mid-stream is not blank
         # until somebody next moves the pen.
@@ -76,6 +82,7 @@ class Live:
         if self.task is not None:
             self.task.cancel()
             self.task = None
+        self._told(False)
         # The page will have changed by the time anybody looks again.
         self.png = None
         self.state = {"type": "live", "state": "dialing"}
@@ -87,6 +94,30 @@ class Live:
         tablet sleeps and roams, and a view left open on a phone should find
         the page again when it wakes rather than needing a reload.
         """
+        beating = asyncio.create_task(self.beats())
+        try:
+            await self._run()
+        finally:
+            beating.cancel()
+
+    async def beats(self) -> None:
+        """Watching, said out loud for as long as it is true.
+
+        From the moment a page opens, not from the first frame: a view that
+        is still dialling a sleeping tablet is somebody waiting to see the
+        page, and the diary must not use those seconds to rub it out.
+        """
+        while self.viewers:
+            self._told(True)
+            await asyncio.sleep(BEAT_S)
+
+    def _told(self, on: bool) -> None:
+        try:
+            self.on_watch(on)
+        except Exception as exc:  # noqa: BLE001 - a missed beat must not end the feed
+            print(f"live: could not say it is watched: {exc!r}", flush=True)
+
+    async def _run(self) -> None:
         while self.viewers:
             try:
                 await self.feed()

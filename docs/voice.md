@@ -183,6 +183,18 @@ whole in the next one. The wire is in
 [protocols.md](protocols.md#wslive--the-tablets-screen-outbound-only) and
 the tablet's side in [device.md](device.md#reading-the-screen).
 
+## The switch
+
+**Vanish and answer**, under the composer, is the trick itself. On, a pause
+is a question: your ink fades and the diary writes back. Off, a pause is only
+a pause and what you write stays -- and Send is off with it, since an answer
+would land on writing that is staying. It is kept in the store, so the loop
+obeys it with no page open, and in this browser's `localStorage` as
+`riddle.vanish`; a server that has never been told takes the browser's word
+for it. Whatever it says, **the diary never vanishes or answers while
+somebody is watching `/live`.** Details in
+[loop.md](loop.md#when-the-diary-keeps-its-hands-off).
+
 ## Putting a document on the tablet
 
 The file button in the header of both pages -- or a file dropped anywhere on

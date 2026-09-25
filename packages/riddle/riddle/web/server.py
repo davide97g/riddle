@@ -144,7 +144,9 @@ class Server:
         self.gate = auth.Gate(config.get().web_password)
         # The page as it is on the tablet, for whoever opens /ws/live. It
         # dials nothing until somebody does.
-        self.live = live.Live(config.get().ssh_host, config.get().live_ms)
+        self.live = live.Live(
+            config.get().ssh_host, config.get().live_ms, on_watch=store.watching
+        )
 
     # --- http ------------------------------------------------------------
 
@@ -419,6 +421,7 @@ class Server:
             "started_ms": self.store.started_ms,
             "listening": self.ears is not None,
             "live": config.get().allow_snap,
+            "vanish": self.store.vanish(),
             "diary": self.diary(),
         }
 
@@ -443,6 +446,13 @@ class Server:
             # ink is off. Like a note, this is left and not waited on.
             self.store.push_intent("web", "clear")
             return
+        if kind == "vanish":
+            # Kept in the store rather than in any one page, because the loop
+            # is what has to obey it, and told to every page, because the
+            # switch on a phone and the one on a laptop are the same switch.
+            on = bool(msg.get("on"))
+            self.store.set_vanish(on)
+            return await self.hub.say({"type": "vanish", "on": on})
         if kind in ("diary.start", "diary.stop"):
             return await self.half(sock, kind == "diary.start")
         if kind == "send":

@@ -4,6 +4,7 @@ import { MicButton } from '@/components/MicButton'
 import { MicPicker } from '@/components/MicPicker'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { VanishSwitch } from '@/components/VanishSwitch'
 import { useAudioCapture } from '@/hooks/useAudioCapture'
 import { useAudioDevices } from '@/hooks/useAudioDevices'
 import { useDiary } from '@/state/RiddleProvider'
@@ -42,13 +43,14 @@ export function Composer() {
         />
         <Button
           onClick={send}
-          disabled={offline || !state.diary.present}
+          disabled={offline || !state.diary.present || !state.vanish}
           className="h-11 transition-transform duration-150 ease-out active:scale-[0.97] disabled:active:scale-100"
         >
           Send
         </Button>
       </div>
       <div className="mx-auto mt-2 flex max-w-2xl flex-col items-center gap-1">
+        <VanishSwitch />
         <LevelMeter level={level} live={mic.state === 'recording'} />
         {state.listening && (
           <MicPicker
@@ -65,10 +67,12 @@ export function Composer() {
         {/* Keyed on the sentence: the reason you cannot send changes while
             you are reading it, and a swap without a fade reads as a glitch. */}
         <p
-          key={`${state.diary.present}-${state.listening}`}
+          key={`${state.diary.present}-${state.listening}-${state.vanish}`}
           className="row-in text-center text-xs text-muted-foreground"
         >
-          {!state.diary.present
+          {!state.vanish
+            ? 'Vanishing is off: what you write stays on the page, and the diary does not answer.'
+            : !state.diary.present
             ? 'The diary is not running, so nothing would answer a send.'
             : !state.listening
               ? 'No speech model loaded, so the microphone is off.'

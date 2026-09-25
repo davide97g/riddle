@@ -72,7 +72,7 @@ is routed.
 | Route | Returns |
 |---|---|
 | `GET /api/health` | `{ok, session}` |
-| `GET /api/state` | `{session, started_ms, now_ms, listening, live, diary:{present, ago_ms, manager, busy}}` |
+| `GET /api/state` | `{session, started_ms, now_ms, listening, live, vanish, diary:{present, ago_ms, manager, busy}}` |
 | `GET /api/events?since=&limit=` | `{events:[DiaryEvent]}`, limit capped at 500 |
 | `GET /api/captures/<name>` | a png from `var/captures`, path-traversal checked on the resolved path |
 | `GET /api/intent/<id>` | `{id, state, result}` |
@@ -110,13 +110,15 @@ Client to server:
 | `note {text}` | records a typed note |
 | `send {at_ms, draft}` | leaves a `send` intent, answered with `intent.ok` |
 | `clear {}` | leaves a `clear` intent: the diary rubs its ink off the page, forgets the conversation and deletes this session. Not acknowledged; the `tool` row with `meta.doing` `cleared` is what says it happened |
+| `vanish {on}` | turns the diary's trick on or off: fade the ink and answer after a pause, or leave the page alone. Stored as `diary.vanish` and told to every page as `vanish` |
 | `diary.start {}` / `diary.stop {}` | brings the half that owns the pen up or down. Not acknowledged; a `diary` message is what says it arrived, and only a failure comes back, as `error` |
 
 Server to client:
 
 | Message | Meaning |
 |---|---|
-| `hello.ok {session, started_ms, now_ms, listening, live, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP` |
+| `vanish {on}` | the switch on the main page was turned, here or on another page |
+| `hello.ok {session, started_ms, now_ms, listening, live, vanish, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP`; `vanish` is the switch, `null` until a page has set it |
 | `event {...DiaryEvent}` | one row of the timeline |
 | `pong {t}` | |
 | `diary {present, ago_ms, manager, busy}` | the half that owns the pen came, went, or is being started or stopped. Sent on every change |

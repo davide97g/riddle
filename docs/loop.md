@@ -32,6 +32,27 @@ And the pause is measured from a **pen lift**, not from silence — a nib
 resting on the page emits nothing at all, because the input core drops
 repeated coordinates.
 
+## When the diary keeps its hands off
+
+Two things turn a pause back into only a pause, both asked for by the page
+and both read at the moment a turn would start:
+
+- **The switch is off.** "Vanish and answer" on the main page, kept in the
+  store as `diary.vanish`. Off, nothing fades and nothing is written back:
+  the page is for notes that are meant to stay.
+- **Somebody is watching the tablet live.** While `/live` is open the voice
+  server refreshes `live.watching` every five seconds, and the loop treats a
+  beat younger than fifteen seconds as a person looking at the page -- which
+  the diary must not rub out underneath them. A beat rather than a flag, so
+  a voice server that dies with a page open cannot stop the diary for good.
+
+A pause sat out this way **lets the strokes go** rather than keeping them for
+later: kept, they would be erased by the next turn that did happen, which is
+exactly the writing that was meant to stay. They are not the diary's ink
+either, so the eraser on the page leaves them alone. A Send in either state
+is refused with the reason, as an `error` row, rather than answered on top of
+writing that is staying.
+
 ## A turn
 
 ```

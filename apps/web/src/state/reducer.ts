@@ -19,6 +19,10 @@ export type State = {
   listening: boolean
   /** whether the server will stream the tablet's screen */
   live: boolean
+  /** whether the diary fades the ink and answers after a pause */
+  vanish: boolean
+  /** whether the server had a value for it, or only the default */
+  vanishKnown: boolean
   /** whether the half that owns the pen is running */
   diary: DiaryPresence
   conn: Conn
@@ -39,6 +43,8 @@ export const initial: State = {
   greetedAt: null,
   listening: false,
   live: false,
+  vanish: true,
+  vanishKnown: false,
   diary: { present: false, ago_ms: null, manager: 'here', busy: false },
   conn: 'connecting',
   draft: '',
@@ -142,12 +148,17 @@ export function reduce(state: State, action: Action): State {
           greetedAt: performance.now(),
           listening: msg.listening,
           live: msg.live ?? false,
+          vanish: msg.vanish ?? state.vanish,
+          vanishKnown: typeof msg.vanish === 'boolean',
           diary: msg.diary ?? state.diary,
         }
       }
       if (msg.type === 'diary') {
         const { type: _ignored, ...diary } = msg
         return { ...state, diary }
+      }
+      if (msg.type === 'vanish') {
+        return { ...state, vanish: msg.on, vanishKnown: true }
       }
       if (msg.type === 'hearing') {
         return { ...state, hearing: msg.on }

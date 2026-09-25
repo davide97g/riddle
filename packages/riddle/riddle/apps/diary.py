@@ -35,6 +35,7 @@ TAP_TRAVEL = 25       # px of travel below which a stroke is a press, not a mark
 MIN_INK = 500         # px of travel before the page holds anything to answer
 MIN_SPAN = 110        # px of bounding box: a word is wider than a dot
 ERASE_RADIUS = 28     # px: an eraser pass this close takes the stroke with it
+LIVE_FRESH_MS = 15_000  # a live view's beat older than this has gone
 
 BEAT_S = 5.0          # how often the loop says it is still here
 PUMP_S = 0.25         # how often intents are looked for, matching the page's poll
@@ -375,6 +376,10 @@ class Session:
 
             idle = time.monotonic() - self.last_input
             if not self.pen_down and idle >= self.pause_s and self.question():
+                why = self.hands_off()
+                if why:
+                    self.let_be(why)
+                    continue
                 print(f"paused {idle:.1f}s", file=sys.stderr)
                 self.answer("pause")
 
@@ -405,6 +410,36 @@ class Session:
             print(f"erased {len(self.strokes) - len(keep)} stroke(s)", file=sys.stderr)
         self.strokes = [self.strokes[i] for i in keep]
         self.stroke_times = [self.stroke_times[i] for i in keep]
+
+    def hands_off(self) -> str | None:
+        """Why the diary must leave the page alone right now, if it must.
+
+        Two reasons, both the page's to give. The switch on the main page
+        turns the whole trick off -- no fading, no answer -- for writing that
+        is meant to stay. And while anybody is watching the tablet live the
+        diary never touches the page, whatever the switch says: the live view
+        is for seeing what you wrote, and a page that rubbed itself out
+        underneath it would be showing the diary instead.
+
+        Read at the moment a turn would start, never cached: both can change
+        while the pen is down.
+        """
+        if self.store.vanish() is False:
+            return "the diary is set to leave the page alone"
+        if self.store.watched(LIVE_FRESH_MS):
+            return "the page is being watched live"
+        return None
+
+    def let_be(self, why: str) -> None:
+        """A pause the diary sat out: what was written stays, and is let go.
+
+        Dropped rather than kept for later. Held on to, it would be erased
+        by the next turn that did happen -- the switch goes back on, a Send
+        -- which is exactly the writing it was meant to leave alone. It is
+        not the diary's ink either, so the eraser on the page leaves it too.
+        """
+        print(f"left {len(self.strokes)} stroke(s) on the page: {why}", file=sys.stderr)
+        self.strokes, self.stroke_times = [], []
 
     def question(self) -> bool:
         """Whether what is on the page is enough to be worth answering.
@@ -471,6 +506,14 @@ class Session:
     def serve(self, intent: dict) -> None:
         action = intent["action"]
         if action == "send":
+            why = self.hands_off()
+            if why:
+                # Refused rather than answered in the air: a turn with the
+                # ink left where it is would write the answer over it.
+                self.store.finish_intent(intent["id"], ok=False, result={"error": why})
+                self.store.add_event("error", text=why, meta={"intent": intent["id"]})
+                print(f"refused a send: {why}", file=sys.stderr)
+                return
             self.answer("send", intent=intent)
             return
         if action == "forget":

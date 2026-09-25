@@ -495,6 +495,35 @@ class Store:
         ).fetchone()
         return json.loads(row["value"]) if row else default
 
+    # --- whether the diary may write on the page -------------------------
+
+    def vanish(self) -> bool | None:
+        """Whether the diary takes the ink off and answers, as the page set it.
+
+        `None` until somebody has set it, which the loop reads as yes: that
+        is what the diary always did, and a page that has never been opened
+        should not quietly change it.
+        """
+        value = self.get_state("diary.vanish")
+        return value if isinstance(value, bool) else None
+
+    def set_vanish(self, on: bool) -> None:
+        self.set_state("diary.vanish", bool(on))
+
+    def watching(self, on: bool) -> None:
+        """Say a page is watching the tablet live, or that the last one left.
+
+        Wall-clock ms, like the heartbeats in `sessions`, so it outlives a
+        session change, and refreshed every few seconds rather than set once:
+        a voice server that dies with a page open must not keep the diary's
+        hands off the page for ever.
+        """
+        self.set_state("live.watching", int(time.time() * 1000) if on else None)
+
+    def watched(self, within_ms: int) -> bool:
+        seen = self.get_state("live.watching")
+        return isinstance(seen, int) and 0 <= time.time() * 1000 - seen < within_ms
+
     def intent(self, intent_id: int) -> dict | None:
         row = self.conn.execute(
             "SELECT id, state, result FROM intents WHERE id = ?", (intent_id,)

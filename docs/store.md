@@ -86,9 +86,13 @@ pixels lose nothing.
 **`intents`** — the only way another process asks the diary to do something.
 See below.
 
-**`state`** — small shared facts neither half owns. `asr.inflight` is the one
-that matters: it is how the loop knows a sentence is still with the speech
-model.
+**`state`** — small shared facts neither half owns. `asr.inflight` is how
+the loop knows a sentence is still with the speech model. `diary.vanish` is
+the switch on the main page, absent until a page first sets it, which the
+loop reads as on. `live.watching` is the wall-clock ms of the newest beat
+from a page watching `/live`, or null once the last one left; the loop keeps
+its hands off the page while it is under fifteen seconds old. See
+[loop.md](loop.md#when-the-diary-keeps-its-hands-off).
 
 **`speech_fts`** — an external-content FTS5 index over `events.text` for
 `speech`, `note` and `reply`. Its update trigger is `AFTER UPDATE OF text`
