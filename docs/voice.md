@@ -171,8 +171,9 @@ items seem to mean. Next to Snapshot it takes one and opens it with the
 reading arriving beside it; on any snapshot on the shelf, however old, it
 reads that one as it was when it was taken. The reading is kept with the
 snapshot, so opening it again costs nothing, and asking again replaces it.
-It is `RIDDLE_UNDERSTAND_MODEL`, `gpt-6-luna` by default, with the diary's
-key -- one call with a strict json schema, a few seconds, no history. It
+It is `RIDDLE_UNDERSTAND_MODEL`, `gpt-5.6-luna` at `RIDDLE_UNDERSTAND_EFFORT`
+`low` by default, with the diary's key -- one call with a strict json schema,
+about five seconds, no history. It
 does not need the diary, and it never reads the tablet: the snapshot the
 page already has is what is sent. Safari and Chrome copy images; a browser that cannot
 still keeps the snapshot and says it did not copy. Only frames that changed are sent, so the line above the page says when it

@@ -318,6 +318,7 @@ class Server:
             read = await asyncio.to_thread(
                 understand, body, key=cfg.openai_key,
                 model=cfg.understand_model, url=cfg.openai_url,
+                effort=cfg.understand_effort,
             )
         except Exception as exc:  # noqa: BLE001 - the model's answer, passed on
             print(f"understand: {exc}", flush=True)

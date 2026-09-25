@@ -32,7 +32,8 @@ nothing reads, a value of the wrong type, and a stale example file.
 | `RIDDLE_OPENAI_MODEL` | `gpt-4.1-mini` | the loop | Which model answers. It has to be able to see -- the page is attached to the turn -- and it has to be quick, because the reply is two dozen words and the pause is already over. |
 | `RIDDLE_OPENAI_KEY` | `unset` | the loop | The OpenAI API key. Put it in .env, which is gitignored and must be chmod 600. |
 | `RIDDLE_OPENAI_URL` | `https://api.openai.com/v1` | the loop | Where that API lives. Anything OpenAI-compatible that takes an image works, which is how a local model would be dropped in. |
-| `RIDDLE_UNDERSTAND_MODEL` | `gpt-6-luna` | the voice server | Which model reads a snapshot on the live page when you press Understand. The one that reads handwriting best rather than the quickest: somebody pressed a button and can wait a few seconds. Same key and url as the diary's. |
+| `RIDDLE_UNDERSTAND_MODEL` | `gpt-5.6-luna` | the voice server | Which model reads a snapshot on the live page when you press Understand. Same key and url as the diary's. On a real page gpt-5.6-luna read more, and faster, than gpt-6-luna. |
+| `RIDDLE_UNDERSTAND_EFFORT` | `low` | the voice server | How hard that model thinks before it answers: none, low, medium, high. low read a page as well as the default in under five seconds instead of six to thirteen. Empty sends nothing, for a model that does not take the parameter. |
 | `RIDDLE_MAX_WORDS` | `22` | the loop | How long a reply may be. A page is small and the pen is slow. |
 
 ## the hand

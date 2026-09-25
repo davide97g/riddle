@@ -11,9 +11,9 @@ lay the parts out instead of printing a paragraph. One call, no history, no
 tools: each page is understood on its own.
 
 Its own model, `RIDDLE_UNDERSTAND_MODEL`, because the two jobs want different
-ones. The diary wants the cheapest thing that can read handwriting before a
-pause stops feeling like one; this wants the model that reads it best, and a
-person who pressed a button can wait three seconds.
+ones: the diary wants the cheapest thing that can read handwriting before a
+pause stops feeling like one, this wants a thorough reading that still comes
+back while the person who pressed the button is looking.
 """
 
 import base64
@@ -71,7 +71,9 @@ SCHEMA = {
 }
 
 
-def understand(png: bytes, *, key: str, model: str, url: str, timeout: int = 90) -> dict:
+def understand(
+    png: bytes, *, key: str, model: str, url: str, effort: str = "", timeout: int = 90
+) -> dict:
     """What the model makes of one page, as the schema's fields plus timing."""
     if not key:
         raise RuntimeError("no OpenAI key: put RIDDLE_OPENAI_KEY in .env")
@@ -103,6 +105,12 @@ def understand(png: bytes, *, key: str, model: str, url: str, timeout: int = 90)
         # reasoning first. `max_tokens` is refused by the newer models.
         "max_completion_tokens": 6000,
     }
+    # Reading a page is not a puzzle. `low` read a real page as well as the
+    # model's own default, in under five seconds rather than six to
+    # thirteen; the transcript is the slow part, and thinking harder does
+    # not make handwriting any clearer.
+    if effort:
+        asked["reasoning_effort"] = effort
     request = urllib.request.Request(
         f"{url.rstrip('/')}/chat/completions",
         data=json.dumps(asked).encode(),
