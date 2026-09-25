@@ -148,6 +148,9 @@ class Session:
         self.store = self._open_store()
         self.memory = Memory(paths.MEMORIES, on_keep=self._remembered)
         self.diary = open_mind(cfg, memory=self.memory)
+        # Before the connect: waiting for a tablet that does not answer yet
+        # beats the store, and a beat reads this.
+        self._last_beat = 0.0
         self.device = self._connect("the diary is starting")
         self.strokes: list[list[tuple[float, float]]] = []
         # When each stroke began and ended, on the store's clock rather than
@@ -175,7 +178,6 @@ class Session:
         # not mistake the diary's own work for the writer clearing the page,
         # and so an intent does not arrive in the middle of a turn.
         self.answering = threading.Event()
-        self._last_beat = 0.0
         self._last_pump = 0.0
         # Page turns noticed by the watcher thread. Forgetting writes a `tool`
         # row, and the store's connection belongs to this thread, so the
