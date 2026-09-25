@@ -172,7 +172,7 @@ Server to client, two kinds of frame:
 
 | Frame | Meaning |
 |---|---|
-| binary | one png, the whole screen, 1404x1872 greyscale. Sent only when it differs from the last one, so silence means an unchanged page, not a dead feed |
+| binary | one png, the whole screen in greyscale, turned the way the page is being read: 1404x1872 for a portrait page, 1872x1404 for a landscape one. Sent only when it differs from the last one, so silence means an unchanged page, not a dead feed |
 | text `live {state, message?}` | `dialing` until the tablet answers, `on` while frames arrive, `lost` with the reason when the link dropped. A lost feed is redialled by the server every five seconds while anyone is watching |
 
 A page that opens mid-stream is sent the state and then the newest frame, so

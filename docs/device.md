@@ -188,6 +188,19 @@ layout first and otherwise takes the nearest anonymous rw mapping after
 are xochitl's page caches. Putting a document in the library restarts
 xochitl, which is how this was found.
 
+The frame is always the panel's own portrait; a landscape document is
+xochitl painting sideways into it. There is no file that says which way up
+the page is, but xochitl logs `Setting new orientation <name>` each time it
+opens a document, and the journal can be asked for the current process's
+lines alone (`_PID=`), a few dozen and 50ms. The tablet's `journalctl` has no
+PCRE, so it is grep. The read reports it on stderr as `O <name>` -- the live
+stream once per frame, asking only for journal lines after a cursor -- and
+the host turns the picture upright: `InvertedLandscape`, which is what this
+tablet reports for landscape, a quarter turn clockwise, checked against a
+real frame; `Landscape` and `InvertedPortrait` by symmetry, since it has
+never logged them. So a snapshot, a download, the model's photograph and
+Understand all see a landscape page the right way up.
+
 This reads another process's address space, so it has its own gate:
 `--yes` or `RIDDLE_ALLOW_SNAP=1`, separate from the drawing one.
 

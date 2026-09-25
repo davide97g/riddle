@@ -154,7 +154,15 @@ does **not** need the diary running — the feed is its own ssh connection,
 so it keeps going while the loop is stopped, or busy drawing an answer.
 
 It opens no events socket, only `/ws/live`, and leaving it is what ends the
-feed.
+feed. A landscape document arrives landscape: the server turns each frame
+the way xochitl is showing it, and the page takes the frame's shape.
+
+**Paper** or **Ink**, beside Understand, is how a picture of the page is
+shown. Paper, the default, is the page as it is: white paper, black ink, in
+either theme. Ink drops the paper and lays the ink on the theme, which in
+the dark theme is a negative -- right for handwriting, wrong for a
+photograph or a pdf. It applies to the live page, the shelf and the
+previews, and is remembered in this browser as `riddle.look`.
 
 ## Sharing a screen with the tablet
 

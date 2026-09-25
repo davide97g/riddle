@@ -1,10 +1,11 @@
 import { Camera, Copy, Download, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { INK } from '@/components/rows/Rows'
 import { InkDots, StatusLine } from '@/components/Status'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog'
+import { lookClass } from '@/hooks/useLook'
+import type { Look } from '@/hooks/useLook'
 import { blobOf, copyPng, fileName } from '@/hooks/useSnapshots'
 import type { Reading, Snapshot } from '@/hooks/useSnapshots'
 
@@ -42,6 +43,8 @@ export type ShelfActions = {
    *  understood can open itself */
   open: string | null
   setOpen: (id: string | null) => void
+  /** paper or ink, the same as the live page beside it */
+  look: Look
 }
 
 /** Take the frame on screen: onto the clipboard, and onto the shelf.
@@ -284,7 +287,13 @@ function Kept({ snap, act }: { snap: Snapshot; act: ShelfActions }) {
         className="relative block cursor-zoom-in rounded-sm border bg-background transition-transform duration-150 ease-out active:scale-[0.98]"
         aria-label={`Open the snapshot from ${label}`}
       >
-        <img src={snap.png} alt="" className={`aspect-[1404/1872] w-full ${INK}`} />
+        {/* Contained, not cropped: a landscape snapshot sits letterboxed
+            in the portrait tile rather than losing its sides. */}
+        <img
+          src={snap.png}
+          alt=""
+          className={`aspect-[1404/1872] w-full object-contain ${lookClass(act.look)}`}
+        />
         {(reading || snap.understood) && (
           <span
             className="absolute top-1 right-1 flex items-center rounded-full bg-background/90 p-1 text-muted-foreground"
@@ -311,7 +320,7 @@ function Kept({ snap, act }: { snap: Snapshot; act: ShelfActions }) {
             <img
               src={snap.png}
               alt={`The page on the tablet at ${label}`}
-              className={`max-h-[45dvh] w-full rounded-sm border bg-background object-contain md:max-h-[70vh] ${INK}`}
+              className={`max-h-[45dvh] w-full rounded-sm border bg-background object-contain md:max-h-[70vh] ${lookClass(act.look)}`}
             />
             <div className="min-w-0 md:max-h-[70vh] md:overflow-y-auto md:pr-1">
               <Understood snap={snap} act={act} />

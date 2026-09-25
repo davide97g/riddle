@@ -71,7 +71,31 @@ _READ = (
     "count=%d 2>/dev/null | gzip -1 -c"
 ) % PAGES
 
-REMOTE = _FIND + _READ
+# Which way up the page is. The frame is always the panel's own portrait
+# 1404x1872; a landscape document is xochitl painting it sideways into that.
+# There is no file to read it from, but xochitl logs "Setting new
+# orientation <name>" whenever it opens a document, and the journal can be
+# asked for this process's lines alone -- a few dozen, 50ms. The tablet's
+# journalctl has no PCRE, hence grep. Reported on stderr as `O <name>`, one
+# line per frame, so stdout stays nothing but gzip members.
+#
+# The cursor is taken before the scan, so a line logged between the two is
+# seen twice rather than never. After that each frame asks only for what is
+# new since the cursor, which is usually nothing.
+_ORIENT = (
+    'C=$(journalctl _PID=$PID -n 0 --show-cursor --no-pager 2>/dev/null | sed -n "s/^-- cursor: //p"); '
+    'O=$(journalctl _PID=$PID -o cat --no-pager 2>/dev/null | grep -o "Setting new orientation [A-Za-z]*" | tail -n 1); '
+    'O=${O##* }; '
+)
+_ORIENT_NEW = (
+    'NEW=$(journalctl _PID=$PID -o cat --no-pager --after-cursor="$C" --show-cursor 2>/dev/null); '
+    'C2=$(echo "$NEW" | sed -n "s/^-- cursor: //p"); [ -n "$C2" ] && C=$C2; '
+    'O2=$(echo "$NEW" | grep -o "Setting new orientation [A-Za-z]*" | tail -n 1); '
+    '[ -n "$O2" ] && O=${O2##* }; '
+)
+_SAY = 'echo "O ${O:-Portrait}" >&2; '
+
+REMOTE = _FIND + _ORIENT + _SAY + _READ
 
 # The same read on one long-lived connection, one frame per line on stdin.
 # The host paces it rather than a `sleep` over there, so there is never more
@@ -80,11 +104,30 @@ REMOTE = _FIND + _READ
 # stream needs no length prefix and the tablet writes no temporary file. A
 # restarted xochitl leaves $PID stale, dd reads nothing, and the empty member
 # that comes back is a short frame the host rejects and redials.
-STREAM = _FIND + "while read x; do " + _READ + "; done"
+STREAM = _FIND + _ORIENT + "while read x; do " + _ORIENT_NEW + _SAY + _READ + "; done"
+
+# How far PIL turns a frame (counter-clockwise degrees) to stand it upright.
+# InvertedLandscape is what this tablet reports for landscape and was
+# checked against a real frame: the text runs bottom to top, so a quarter
+# turn clockwise. The other two are its mirror images, by reasoning rather
+# than by a frame -- the tablet has never logged them.
+UPRIGHT = {"Portrait": 0, "InvertedPortrait": 180, "Landscape": 90, "InvertedLandscape": -90}
+
+
+def orientation(said: str) -> str:
+    """The newest `O <name>` in what the remote side wrote to stderr."""
+    names = [line[2:].strip() for line in said.splitlines() if line.startswith("O ")]
+    return names[-1] if names and names[-1] in UPRIGHT else "Portrait"
+
+
+def upright(image: Image.Image, name: str) -> Image.Image:
+    turn = UPRIGHT.get(name, 0)
+    return image.rotate(turn, expand=True) if turn else image
 
 
 def grab(host: str = "rm2", timeout: int = 30) -> Image.Image:
-    """The visible screen, as greyscale, the way a photograph of it would look.
+    """The visible screen, as greyscale, the way a photograph of it would look,
+    and the right way up: a landscape document comes back landscape.
 
     The frame is torn: nothing here synchronises with xochitl's painting, so a
     stroke being drawn as this runs can come out half finished. That is fine
@@ -93,10 +136,12 @@ def grab(host: str = "rm2", timeout: int = 30) -> Image.Image:
     done = subprocess.run(
         ["ssh", *SSH_OPTIONS, host, REMOTE], capture_output=True, timeout=timeout
     )
+    said = done.stderr.decode(errors="replace")
     if done.returncode != 0:
-        raise RuntimeError(done.stderr.decode().strip() or "could not read the screen")
+        problems = [line for line in said.splitlines() if not line.startswith("O ")]
+        raise RuntimeError("\n".join(problems).strip() or "could not read the screen")
 
-    return frame(gzip.decompress(done.stdout))
+    return upright(frame(gzip.decompress(done.stdout)), orientation(said))
 
 
 def frame(raw: bytes) -> Image.Image:
@@ -115,7 +160,7 @@ def png(host: str = "rm2", scale: float = 1.0, timeout: int = 30) -> bytes:
     """The screen as PNG bytes, for handing to something that wants a picture."""
     shot = grab(host, timeout)
     if scale != 1.0:
-        size = (round(FB_W * scale), round(FB_H * scale))
+        size = (round(shot.width * scale), round(shot.height * scale))
         shot = shot.resize(size, Image.LANCZOS)
     buf = io.BytesIO()
     shot.save(buf, format="PNG", optimize=True)

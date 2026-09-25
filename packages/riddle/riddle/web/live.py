@@ -35,11 +35,35 @@ BEAT_S = 5.0    # how often the store hears that somebody is still watching
 CHUNK = 1 << 16
 
 
-def encode(raw: bytes) -> bytes:
-    """One read of the painted buffer as the png a browser is sent."""
+def encode(raw: bytes, facing: str) -> bytes:
+    """One read of the painted buffer as the png a browser is sent, turned
+    the way the page is being read: a landscape document arrives landscape."""
     buf = io.BytesIO()
-    screen.frame(raw).save(buf, format="PNG")
+    screen.upright(screen.frame(raw), facing).save(buf, format="PNG")
     return buf.getvalue()
+
+
+class Said:
+    """What the tablet writes on stderr, read as it arrives.
+
+    Every frame comes with an `O <orientation>` line, so this pipe has to be
+    drained the whole time -- left alone it fills in an hour and the tablet
+    blocks writing to it. Anything that is not an orientation is a complaint,
+    kept for when the stream dies and somebody asks why.
+    """
+
+    def __init__(self) -> None:
+        self.facing = "Portrait"
+        self.complaints: list[str] = []
+
+    async def read(self, stream) -> None:
+        async for raw in stream:
+            line = raw.decode(errors="replace").strip()
+            if line.startswith("O "):
+                name = line[2:].strip()
+                self.facing = name if name in screen.UPRIGHT else "Portrait"
+            elif line:
+                self.complaints = (self.complaints + [line])[-5:]
 
 
 class Live:
@@ -139,39 +163,49 @@ class Live:
         )
         clock = asyncio.get_running_loop()
         last = None
+        said = Said()
+        listening = asyncio.create_task(said.read(proc.stderr))
         try:
             while self.viewers:
                 began = clock.time()
                 proc.stdin.write(b"\n")
                 await proc.stdin.drain()
-                raw = await asyncio.wait_for(self.member(proc), FRAME_S)
+                raw = await asyncio.wait_for(self.member(proc, said, listening), FRAME_S)
                 if self.state["state"] != "on":
                     await self.tell("on")
-                if raw != last:
-                    last = raw
+                # Turning the tablet round with nothing else changing is
+                # still a new picture.
+                if (raw, said.facing) != last:
+                    last = (raw, said.facing)
                     # Off the event loop: a png of the whole page is tens of
                     # milliseconds, and this loop also delivers the timeline.
-                    self.png = await asyncio.to_thread(encode, raw)
+                    self.png = await asyncio.to_thread(encode, raw, said.facing)
                     await self.fan(self.png)
                 await asyncio.sleep(max(0.0, self.every - (clock.time() - began)))
         finally:
             if proc.returncode is None:
                 proc.kill()
             await proc.wait()
+            listening.cancel()
 
-    async def member(self, proc) -> bytes:
+    async def member(self, proc, said: "Said", listening: asyncio.Task) -> bytes:
         """One frame: exactly one gzip member off the stream."""
         unzip = zlib.decompressobj(wbits=31)
         out = []
         while not unzip.eof:
             chunk = await proc.stdout.read(CHUNK)
             if not chunk:
-                said = (await proc.stderr.read()).decode(errors="replace").strip()
+                # stderr closes when the process does; wait for its last
+                # words rather than racing them.
+                try:
+                    await asyncio.wait_for(asyncio.shield(listening), 2.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    pass
                 # The last line: ssh says why it gave up at the end, and the
                 # page has one line to say it in. The log gets the rest.
-                if said:
-                    print(f"live: {said}", flush=True)
-                raise RuntimeError(said.splitlines()[-1] if said else "the tablet hung up")
+                if said.complaints:
+                    print(f"live: {' / '.join(said.complaints)}", flush=True)
+                raise RuntimeError(said.complaints[-1] if said.complaints else "the tablet hung up")
             out.append(await asyncio.to_thread(unzip.decompress, chunk))
         return b"".join(out)
 

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { LiveScreen } from '@/components/LiveScreen'
+import { LookToggle } from '@/components/LookToggle'
 import { PageMenu } from '@/components/PageMenu'
 import { SendToTablet } from '@/components/SendToTablet'
 import { SnapButton, SnapshotShelf, UnderstandButton } from '@/components/Snapshots'
 import { Wordmark } from '@/components/Wordmark'
 import { useLiveScreen } from '@/hooks/useLiveScreen'
+import { useLook } from '@/hooks/useLook'
 import { useSnapshots } from '@/hooks/useSnapshots'
 
 /** `/live`: the page on the tablet, and nothing else.
@@ -18,7 +20,8 @@ export function LivePage() {
   const live = useLiveScreen()
   const { snaps, kept, reading, take, remove, understand } = useSnapshots()
   const [open, setOpen] = useState<string | null>(null)
-  const act = { remove, understand, reading, open, setOpen }
+  const [look, setLook] = useLook()
+  const act = { remove, understand, reading, open, setOpen, look }
 
   useEffect(() => {
     const was = document.title
@@ -47,8 +50,10 @@ export function LivePage() {
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <LiveScreen
           live={live}
+          look={look}
           action={
             <>
+              <LookToggle look={look} setLook={setLook} />
               <UnderstandButton
                 frame={live.blob}
                 take={take}

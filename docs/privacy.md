@@ -21,12 +21,13 @@ entirely without breaking anything that matters.
 | `var/backups/rm2-*` | a whole tablet: every notebook, its shell history, **its private ssh keys** | until you delete it |
 | `.env` | the tablet's root password | — |
 
-The page itself keeps three things, in the browser rather than on this
+The page itself keeps four things, in the browser rather than on this
 machine, both in `localStorage`:
 
 - `riddle.mic`, the id of the microphone you chose. It is an identifier for
   a device, not a recording.
 - `riddle.vanish`, whether the switch on the main page is on.
+- `riddle.look`, paper or ink, how the live page shows the page.
 - `riddle.snapshots`, up to ten **photographs of your whole page**, taken
   with the Snapshot button on `/live`: full-size pngs, exactly the frames the
   live view was sent, with the model's reading of each one you pressed
@@ -34,9 +35,9 @@ machine, both in `localStorage`:
   one can be deleted from the shelf; anyone who can open that browser can
   see them until then.
 
-The microphone and the snapshots never reach the server; the switch does,
-because the diary is what obeys it. Clearing the site's data forgets all
-three here.
+The microphone, the snapshots and the look never reach the server; the
+switch does, because the diary is what obeys it. Clearing the site's data
+forgets all four here.
 
 Two caveats about the pruning. `RIDDLE_AUDIO_KEEP_DAYS` is applied **at
 startup only**, so a voice server left running for a month never prunes.
