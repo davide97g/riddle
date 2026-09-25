@@ -156,6 +156,31 @@ so it keeps going while the loop is stopped, or busy drawing an answer.
 It opens no events socket, only `/ws/live`, and leaving it is what ends the
 feed.
 
+## Sharing a screen with the tablet
+
+`/share` is the third page in the menu. It shares a screen, window or tab
+from the browser (`getDisplayMedia`), and nothing leaves the browser until
+**Send frame**: that takes the frame on screen, letterboxes it onto white in
+a page of the tablet's own proportions -- 1872x1404 for a wide frame,
+1404x1872 for a tall one -- and puts it in the library through
+`POST /api/library`, exactly like a picture from the upload button. So it
+costs what that costs: xochitl restarts, the screen reloads for about ten
+seconds, and the document (`Share HH:MM`) is opened by hand.
+
+One frame at a time on purpose. The tablet has no way to be shown a picture
+but as a document, so a live feed *to* it is not possible; the fast half is
+the way back. While the page shares it beats `share` on `/ws/events`, and
+while that beat is fresh the loop writes every stroke as an `ink` event the
+moment the pen lifts -- the page draws it over the shared screen, or over
+the frame the tablet has, within about half a second. An eraser pass comes
+back too and rubs out what it crosses. The page being the screen's shape is
+what makes this exact: xochitl fits it by scaling alone, so a point on the
+panel is a point on the frame.
+
+It needs the diary running, which is what holds the pen, and while it shares
+the diary keeps its hands off the page. It does not need
+`RIDDLE_ALLOW_SNAP`: nothing reads the screen.
+
 **Snapshot** takes the frame on screen: it goes onto the clipboard as a png
 and onto the shelf beside the page (under it on a phone), which keeps the
 last ten in the browser's `localStorage` and survives a reload. Each one

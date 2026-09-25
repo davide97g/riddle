@@ -152,6 +152,18 @@ resolution, and on a page whose long side is the screen's own 8.28in at
 `landscape` in its `.content`, so xochitl turns the page rather than shrinking
 it to a strip across a tall screen.
 
+`/share` leans on that fit. Its frames are always exactly the screen's
+proportions (1404x1872, or 1872x1404 landscape), so the page fills the panel
+by scaling alone and a pen point maps to the frame with no margins to
+measure. What does need measuring is **which way xochitl turns a landscape
+page**. `apps/web/src/lib/share.ts` assumes the page's top edge lies along
+the panel's right edge (`LANDSCAPE_TOP`); that is **not yet verified on the
+tablet**. To settle it, share a window showing a label in each corner, send
+a frame, write a mark on each corner at the tablet, and check the marks land
+on the labels on the page. If they come back a half turn out, flip
+`LANDSCAPE_TOP` and record the answer here. Whether the toolbar, open,
+covers the page or shrinks it is the other thing to look at while there.
+
 ## Reading the screen
 
 There is no framebuffer to read, so `riddle snap --yes` takes the cruder

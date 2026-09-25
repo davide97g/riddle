@@ -34,8 +34,8 @@ repeated coordinates.
 
 ## When the diary keeps its hands off
 
-Two things turn a pause back into only a pause, both asked for by the page
-and both read at the moment a turn would start:
+Three things turn a pause back into only a pause, all asked for by a page
+and all read at the moment a turn would start:
 
 - **The switch is off.** "Vanish and answer" on the main page, kept in the
   store as `diary.vanish`. Off, nothing fades and nothing is written back:
@@ -45,6 +45,12 @@ and both read at the moment a turn would start:
   beat younger than fifteen seconds as a person looking at the page -- which
   the diary must not rub out underneath them. A beat rather than a flag, so
   a voice server that dies with a page open cannot stop the diary for good.
+- **Somebody is sharing a screen with the tablet.** While `/share` has a
+  screen up it sends a `share` beat every five seconds, kept as
+  `share.watching` and read the same way: the page is somebody's slide, and
+  what is written on it is for them. The same beat is what makes the loop
+  send each stroke back as an `ink` event as it ends -- see
+  [voice.md](voice.md#sharing-a-screen-with-the-tablet).
 
 A pause sat out this way **lets the strokes go** rather than keeping them for
 later: kept, they would be erased by the next turn that did happen, which is

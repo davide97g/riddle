@@ -81,7 +81,7 @@ is routed.
 | `POST /api/understand` | a png as the body, a snapshot from `/live`. Asks `RIDDLE_UNDERSTAND_MODEL` what is on it: `{title, kind, summary, points[], transcript, model, took_ms}`. `400` for anything but a png, `502` with the model's own complaint |
 | `POST /api/library?name=` | the raw file as the body: a pdf, an epub or an image. Puts it in the tablet's library and restarts xochitl, and answers once it is back: `{id, name, kind, pages, bytes}`. `400` for a file it cannot use, `409` while another is going in, `413` over 64MB (refused on the headers, before the body is read), `502` with the tablet's own complaint |
 | `POST /api/login` | form-encoded `password`; `303` to `/` with the cookie, or the form again with `401` |
-| anything else | the built client, with index as the fallback so routing works: `/live` is the live page, anything else the timeline |
+| anything else | the built client, with index as the fallback so routing works: `/live` is the live page, `/share` the share page, anything else the timeline |
 
 There is deliberately **no route for `var/audio`**. Those files are a
 recording of a room.
@@ -112,6 +112,7 @@ Client to server:
 | `clear {}` | leaves a `clear` intent: the diary rubs its ink off the page, forgets the conversation and deletes this session. Not acknowledged; the `tool` row with `meta.doing` `cleared` is what says it happened |
 | `vanish {on}` | turns the diary's trick on or off: fade the ink and answer after a pause, or leave the page alone. Stored as `diary.vanish` and told to every page as `vanish` |
 | `diary.start {}` / `diary.stop {}` | brings the half that owns the pen up or down. Not acknowledged; a `diary` message is what says it arrived, and only a failure comes back, as `error` |
+| `share {on}` | a beat from `/share` every five seconds while a screen is shared, and `on: false` when it stops. Stored as `share.watching`. While it is under fifteen seconds old the loop writes each stroke as an `ink` event as it ends, and keeps its hands off the page |
 
 Server to client:
 
@@ -119,7 +120,7 @@ Server to client:
 |---|---|
 | `vanish {on}` | the switch on the main page was turned, here or on another page |
 | `hello.ok {session, started_ms, now_ms, listening, live, vanish, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP`; `vanish` is the switch, `null` until a page has set it |
-| `event {...DiaryEvent}` | one row of the timeline |
+| `event {...DiaryEvent}` | one row of the timeline. An `ink` event is not a row: its `meta` is `{tool: "pen"\|"rubber", points: [[x, y], ...]}`, one stroke in panel pixels (1404x1872, portrait), and only `/share` draws it |
 | `pong {t}` | |
 | `diary {present, ago_ms, manager, busy}` | the half that owns the pen came, went, or is being started or stopped. Sent on every change |
 | `hearing {on}` | the energy gate opened or closed |

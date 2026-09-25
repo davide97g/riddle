@@ -104,6 +104,9 @@ export function Timeline() {
               )
             case 'error':
               return <ErrorRow key={row.id} event={event} />
+            case 'ink':
+              // Never placed by the reducer; drawn on /share instead.
+              return null
             default:
               return null
           }

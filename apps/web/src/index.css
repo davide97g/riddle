@@ -11,6 +11,10 @@
        emerald-500 spelled out in four places; it is a token now so the mic,
        the meter and the badge cannot drift apart. */
     --color-live: var(--live);
+    /* The pen on /share, drawn over somebody else's screen: it has to read
+       over whatever colours that screen happens to be, so it is the one
+       loud colour, and it is not the live green, which means something. */
+    --color-annotate: var(--annotate);
     --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -86,6 +90,7 @@
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
     --live: oklch(0.696 0.17 162.48);
+    --annotate: oklch(0.6 0.25 20);
 }
 
 .dark {
@@ -123,6 +128,7 @@
     /* Lighter, not the same green dimmed: emerald-500 on near-black reads
        muddy and fails contrast against the card. */
     --live: oklch(0.765 0.153 163.2);
+    --annotate: oklch(0.7 0.22 20);
 }
 
 @layer base {

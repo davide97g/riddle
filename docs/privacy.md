@@ -15,7 +15,7 @@ entirely without breaking anything that matters.
 | `var/captures/page-*.png` | photographs of what you wrote, rendered from the strokes and sent to the model | **forever** — nothing prunes these yet |
 | `var/captures/whole-*.png` | photographs of your **whole page**, read off the tablet's screen, one per turn while `RIDDLE_ALLOW_SNAP=1` | **forever** — nothing prunes these either |
 | `var/audio/utt-*.wav` | recordings of your room, one per utterance | `RIDDLE_AUDIO_KEEP_DAYS`, 7 by default |
-| `var/riddle.db` | every transcript, every stroke, every reply, what each turn cost | until you delete it |
+| `var/riddle.db` | every transcript, every stroke, every reply, what each turn cost -- and while `/share` is sharing, every stroke again, one row each as it is written, erased ones included | until you delete it |
 | `var/memories.txt` | the handful of lines the diary chose to keep | until you delete it |
 | `var/chat.json` | the conversation itself: the API keeps none of it, so this is where the thread lives | until the page turns |
 | `var/backups/rm2-*` | a whole tablet: every notebook, its shell history, **its private ssh keys** | until you delete it |
@@ -82,6 +82,10 @@ One company, and it is worth knowing what it sees.
   this machine: it is packed in memory and piped into xochitl's store. From
   there it is the tablet's like any other document -- including to
   reMarkable's cloud, if sync is on.
+- **A frame sent from `/share` is such a document**: a picture of whatever
+  screen was shared, as it was when Send was pressed. It stays in the
+  tablet's library, and syncs with it, until it is deleted there. The shared
+  screen itself never leaves the browser; only the frames you send do.
 - Nothing else. The server binds loopback; `riddle voice share` exposes it
   only on your own tailnet, behind a certificate.
 

@@ -180,6 +180,9 @@ export function reduce(state: State, action: Action): State {
         // marker itself is not placed: what is left is an empty timeline.
         if (row.kind === 'tool' && row.meta.doing === 'cleared')
           return { ...state, rows: new Map(), order: [], seq }
+        // A stroke for /share, one per stroke: a timeline row each would bury
+        // everything else under a slide's worth of scribbles.
+        if (row.kind === 'ink') return { ...state, seq }
         return { ...settle(state, row), seq }
       }
       return state

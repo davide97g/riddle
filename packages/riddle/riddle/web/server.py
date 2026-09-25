@@ -453,6 +453,12 @@ class Server:
             on = bool(msg.get("on"))
             self.store.set_vanish(on)
             return await self.hub.say({"type": "vanish", "on": on})
+        if kind == "share":
+            # A beat, every few seconds while /share has a screen up. The loop
+            # reads it to send each stroke back as it is written, and to keep
+            # its hands off a page that is somebody else's slide.
+            self.store.sharing(bool(msg.get("on")))
+            return
         if kind in ("diary.start", "diary.stop"):
             return await self.half(sock, kind == "diary.start")
         if kind == "send":

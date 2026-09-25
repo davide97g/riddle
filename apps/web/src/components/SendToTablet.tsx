@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { putInLibrary } from '@/lib/library'
 
 /** What the server will take, and the same ceiling it enforces. Checked here
  *  too so a 200MB video is refused now rather than after it has uploaded. */
@@ -117,13 +118,7 @@ export function SendToTablet() {
     if (!file) return
     setSending(true)
     try {
-      const res = await fetch(`/api/library?name=${encodeURIComponent(name.trim() || title(file))}`, {
-        method: 'POST',
-        body: file,
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      })
-      const said = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(said.error ?? `the server answered ${res.status}`)
+      const said = await putInLibrary(file, name.trim() || title(file))
       toast.success(`“${said.name}” is in the library`, {
         description: 'Open it on the tablet once the screen has come back.',
       })

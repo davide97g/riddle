@@ -73,6 +73,7 @@ streams itself.
 | `reply` | the loop | `text`, `meta.intent` when a send caused it |
 | `tool` | the loop | `meta.doing`: opened, thinking, writing, forgetting, cleared, waiting for the tablet, back on the tablet, looking at the whole page |
 | `error` | either | `text` |
+| `ink` | the loop | one stroke as it ended, only while a page shares a screen: `meta.tool` (`pen` or `rubber`) and `meta.points`, `[[x, y], ...]` in panel pixels. `t_ms` is when the pen went down, `dur_ms` how long it stayed |
 | `shot` | the loop | `path` to the photograph of the whole page taken before the eraser ran, and the `dur_ms` it took |
 
 **`strokes`** — geometry, kept out of the timeline because it is bulk and
@@ -92,7 +93,8 @@ the switch on the main page, absent until a page first sets it, which the
 loop reads as on. `live.watching` is the wall-clock ms of the newest beat
 from a page watching `/live`, or null once the last one left; the loop keeps
 its hands off the page while it is under fifteen seconds old. See
-[loop.md](loop.md#when-the-diary-keeps-its-hands-off).
+[loop.md](loop.md#when-the-diary-keeps-its-hands-off). `share.watching` is
+the same beat from `/share`, and also what makes the loop write `ink`.
 
 **`speech_fts`** — an external-content FTS5 index over `events.text` for
 `speech`, `note` and `reply`. Its update trigger is `AFTER UPDATE OF text`

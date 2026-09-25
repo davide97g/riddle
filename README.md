@@ -14,7 +14,10 @@ There is also a second half: a page you can open on your phone, speak into,
 and ask the diary for an answer from. It never touches the pen — it leaves
 a note in a small shared database and the first half picks it up. It can
 also just watch: with `RIDDLE_ALLOW_SNAP=1`, `/live` shows the page on the
-tablet live, about once a second, with no model involved.
+tablet live, about once a second, with no model involved. And `/share`
+goes the other way: a frame of a screen shared from the browser goes to the
+tablet, and what you write on it comes back over that screen, stroke by
+stroke.
 
 Both halves run on a mini PC on the LAN rather than on a laptop, and the page
 is published on a Cloudflare tunnel — the tablet is not, and cannot be: ink

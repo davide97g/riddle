@@ -10,6 +10,15 @@ export type EventKind =
   | 'note'
   | 'tool'
   | 'error'
+  | 'ink' // one stroke as it ends, while /share shares a screen; never a row
+
+/** `meta` of an `ink` event: the stroke in panel pixels, 1404x1872 portrait,
+ *  whatever way the page on the tablet is turned. A rubber stroke is a pass of
+ *  the eraser, which takes whatever it crosses with it. */
+export type InkMeta = {
+  tool: 'pen' | 'rubber'
+  points: [number, number][]
+}
 
 export type DiaryEvent = {
   id: number
@@ -86,6 +95,10 @@ export type ClientMessage =
   | { type: 'vanish'; on: boolean }
   | { type: 'diary.start' }
   | { type: 'diary.stop' }
+  /** a beat from /share while a screen is shared, every few seconds, and
+   *  `on: false` when it stops. While it beats the diary sends every stroke
+   *  back as an `ink` event and keeps its hands off the page */
+  | { type: 'share'; on: boolean }
 
 /** The text half of /ws/live; the binary half is one png per changed frame.
  *  `dialing` until the tablet answers, `on` while frames arrive, `lost` when

@@ -392,14 +392,36 @@ class Session:
             return
         began, ended = self.current_began, self.store.now_ms()
         if self.tool == "rubber":
+            self.share_ink(stroke, began, ended)
             self.rub_out(stroke)
             return
         if travel(stroke) < TAP_TRAVEL:
             return  # a press: a tool in the toolbar, the page woken, a blot
         if max(x for x, _ in stroke) < TOOLBAR_X:
             return  # a drag inside the toolbar strip, e.g. a thickness slider
+        self.share_ink(stroke, began, ended)
         self.strokes.append(stroke)
         self.stroke_times.append((began, ended))
+
+    def share_ink(self, stroke: list[tuple[float, float]], began: int, ended: int) -> None:
+        """Send one stroke to the page sharing a screen, while there is one.
+
+        One `ink` row per stroke, as it ends, rather than a batch per turn:
+        the page is drawing it over somebody's screen, and half a second is
+        the whole point. Only while a share is beating, so a diary nobody is
+        sharing with writes nothing it did not write before.
+        """
+        if not self.store.shared(LIVE_FRESH_MS):
+            return
+        self.store.add_event(
+            "ink",
+            t_ms=began,
+            dur_ms=max(0, ended - began),
+            meta={
+                "tool": "rubber" if self.tool == "rubber" else "pen",
+                "points": [[round(x), round(y)] for x, y in stroke],
+            },
+        )
 
     def rub_out(self, pass_: list[tuple[float, float]]) -> None:
         """Take the pending strokes the eraser just went over off the page."""
@@ -414,20 +436,23 @@ class Session:
     def hands_off(self) -> str | None:
         """Why the diary must leave the page alone right now, if it must.
 
-        Two reasons, both the page's to give. The switch on the main page
+        Three reasons, all the page's to give. The switch on the main page
         turns the whole trick off -- no fading, no answer -- for writing that
         is meant to stay. And while anybody is watching the tablet live the
         diary never touches the page, whatever the switch says: the live view
         is for seeing what you wrote, and a page that rubbed itself out
-        underneath it would be showing the diary instead.
+        underneath it would be showing the diary instead. A shared screen is
+        the same again: the writing is on somebody's slide, for them.
 
-        Read at the moment a turn would start, never cached: both can change
-        while the pen is down.
+        Read at the moment a turn would start, never cached: all of them can
+        change while the pen is down.
         """
         if self.store.vanish() is False:
             return "the diary is set to leave the page alone"
         if self.store.watched(LIVE_FRESH_MS):
             return "the page is being watched live"
+        if self.store.shared(LIVE_FRESH_MS):
+            return "the page is being shared"
         return None
 
     def let_be(self, why: str) -> None:

@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { LiveScreen } from '@/components/LiveScreen'
+import { PageMenu } from '@/components/PageMenu'
 import { SendToTablet } from '@/components/SendToTablet'
 import { SnapButton, SnapshotShelf, UnderstandButton } from '@/components/Snapshots'
 import { Wordmark } from '@/components/Wordmark'
-import { Button } from '@/components/ui/button'
 import { useLiveScreen } from '@/hooks/useLiveScreen'
 import { useSnapshots } from '@/hooks/useSnapshots'
 
@@ -32,22 +31,17 @@ export function LivePage() {
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
       <header className="flex items-center justify-between border-b px-4 py-3">
-        <h1 className="flex items-center gap-2">
-          <Wordmark className="h-4 w-auto" />
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            live
-          </span>
-          <span className="sr-only">riddle, live</span>
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="flex items-center">
+            <Wordmark className="h-4 w-auto" />
+            <span className="sr-only">riddle, live</span>
+          </h1>
+          <PageMenu current="live" />
+        </div>
         <div className="flex items-center gap-2">
           {/* Here as well as on the timeline: this is where you watch it
               arrive. */}
           <SendToTablet />
-          <Button asChild size="icon-sm" variant="ghost">
-            <a href="/" aria-label="Back to the timeline" title="Back to the timeline">
-              <ArrowLeft className="size-4" />
-            </a>
-          </Button>
         </div>
       </header>
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">

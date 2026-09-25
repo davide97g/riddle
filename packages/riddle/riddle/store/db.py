@@ -29,7 +29,7 @@ from riddle.paths import SCHEMA
 # Anything that can be on the timeline. Checked in Python rather than as a
 # column constraint, because adding one to an existing table means rebuilding
 # it, and the value here is catching a typo at the call site.
-KINDS = ("strokes", "speech", "shot", "reply", "note", "tool", "error")
+KINDS = ("strokes", "speech", "shot", "reply", "note", "tool", "error", "ink")
 
 # A session nobody has beaten in this long is over, whatever ended_ms says:
 # a process that was killed outright never got to write it.
@@ -522,6 +522,18 @@ class Store:
 
     def watched(self, within_ms: int) -> bool:
         seen = self.get_state("live.watching")
+        return isinstance(seen, int) and 0 <= time.time() * 1000 - seen < within_ms
+
+    def sharing(self, on: bool) -> None:
+        """Say a page is sharing a screen with the tablet, or has stopped.
+
+        A beat like `watching`, for the same reason: a page closed without a
+        word must not leave the loop sending every stroke for ever.
+        """
+        self.set_state("share.watching", int(time.time() * 1000) if on else None)
+
+    def shared(self, within_ms: int) -> bool:
+        seen = self.get_state("share.watching")
         return isinstance(seen, int) and 0 <= time.time() * 1000 - seen < within_ms
 
     def intent(self, intent_id: int) -> dict | None:
