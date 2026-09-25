@@ -33,22 +33,43 @@ PAGES = -(-BYTES // 4096)
 
 from riddle.device.ssh import BASE as SSH_OPTIONS
 
-# busybox on the tablet: no pidof -s, no python, no lz4. gzip -1 takes the
-# 10.5MB frame down to about 36KB in half a second, which is far cheaper than
-# sending it raw down a usb-ethernet link.
+# Where the painted frame is depends on the xochitl process, not only on the
+# firmware. Most starts put it inside the anonymous mapping right after
+# /dev/fb0, SKIP bytes in -- the layout reSnap carries. Some starts do not:
+# after a restart on 3.28 that mapping was 3MB, and the frame was a mapping
+# of its own, exactly PAGES long, sixty-five entries further on, starting at
+# its first byte. Other screen-sized mappings exist too -- xochitl's page
+# caches, tiled at other widths -- but they sit before /dev/fb0 or are a page
+# longer, so the rule is: the known layout if it fits, else the nearest
+# anonymous rw mapping after /dev/fb0 of exactly the frame's size. Found once
+# per connection, since a restart is also a new pid and a redial.
+#
+# busybox on the tablet: no pidof -s, no python, no lz4, no strtonum in awk,
+# so the maps are walked in sh. gzip -1 takes the 10.5MB frame down to about
+# 36KB in half a second, which is far cheaper than sending it raw.
 _FIND = (
     'PID=$(pidof xochitl | cut -d" " -f1); '
     '[ -n "$PID" ] || { echo "xochitl not running" >&2; exit 1; }; '
-    'MAP=$(grep -C1 /dev/fb0 /proc/$PID/maps | tail -n1); '
-    'BASE=$(echo "$MAP" | sed "s/-.*$//"); '
-    'END=$(echo "$MAP" | sed "s/^[^-]*-//;s/ .*//"); '
-    '[ $(( 0x$END - 0x$BASE )) -ge %d ] || '
-    '{ echo "framebuffer map too small; firmware layout changed" >&2; exit 2; }; '
-) % (SKIP + BYTES)
+    'MAPS=/proc/$PID/maps; '
+    'AT=$(grep -n /dev/fb0 $MAPS | head -n1 | cut -d: -f1); '
+    '[ -n "$AT" ] || { echo "xochitl has no /dev/fb0 mapped" >&2; exit 2; }; '
+    'MAP=$(sed -n "$((AT + 1))p" $MAPS); '
+    'BASE=${MAP%%%%-*}; END=${MAP#*-}; END=${END%%%% *}; '
+    'if [ $(( 0x$END - 0x$BASE )) -ge %(near)d ]; then '
+    'OFF=$(( 0x$BASE + %(skip)d )); '
+    'else '
+    'OFF=$(tail -n +$((AT + 1)) $MAPS | while read R P X D I N; do '
+    '[ "$P" = rw-p ] && [ -z "$N" ] || continue; '
+    'S=$(( 0x${R#*-} - 0x${R%%%%-*} )); '
+    '[ $S -eq %(size)d ] && { echo $(( 0x${R%%%%-*} )); break; }; '
+    'done); '
+    'fi; '
+    '[ -n "$OFF" ] || { echo "no painted frame in xochitl; firmware layout changed" >&2; exit 2; }; '
+) % {"near": SKIP + BYTES, "skip": SKIP, "size": PAGES * 4096}
 _READ = (
-    "dd if=/proc/$PID/mem bs=4096 skip=$(( (0x$BASE + %d) / 4096 )) "
+    "dd if=/proc/$PID/mem bs=4096 skip=$(( OFF / 4096 )) "
     "count=%d 2>/dev/null | gzip -1 -c"
-) % (SKIP, PAGES)
+) % PAGES
 
 REMOTE = _FIND + _READ
 

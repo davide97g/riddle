@@ -166,6 +166,16 @@ version, not xochitl's, so a version test picks the old format and returns
 noise. The map size is the honest guard instead — a layout change fails
 loudly rather than handing back a picture of nothing.
 
+Where the painted frame sits changes from one xochitl start to the next, not
+only between firmwares. Most starts put it `SKIP` bytes into the anonymous
+mapping right after `/dev/fb0`, the layout reSnap carries. After a restart on
+3.28 that mapping was 3MB and the frame was a mapping of its own, exactly
+2567 pages, further down the map at offset zero. So the read tries the known
+layout first and otherwise takes the nearest anonymous rw mapping after
+`/dev/fb0` of exactly the frame's size; the screen-sized mappings before it
+are xochitl's page caches. Putting a document in the library restarts
+xochitl, which is how this was found.
+
 This reads another process's address space, so it has its own gate:
 `--yes` or `RIDDLE_ALLOW_SNAP=1`, separate from the drawing one.
 
