@@ -72,7 +72,7 @@ is routed.
 | Route | Returns |
 |---|---|
 | `GET /api/health` | `{ok, session}` |
-| `GET /api/state` | `{session, started_ms, now_ms, listening, live, vanish, diary:{present, ago_ms, manager, busy}}` |
+| `GET /api/state` | `{session, started_ms, now_ms, listening, live, vanish, watched, diary:{present, ago_ms, manager, busy}}` |
 | `GET /api/events?since=&limit=` | `{events:[DiaryEvent]}`, limit capped at 500 |
 | `GET /api/captures/<name>` | a png from `var/captures`, path-traversal checked on the resolved path |
 | `GET /api/intent/<id>` | `{id, state, result}` |
@@ -119,7 +119,8 @@ Server to client:
 | Message | Meaning |
 |---|---|
 | `vanish {on}` | the switch on the main page was turned, here or on another page |
-| `hello.ok {session, started_ms, now_ms, listening, live, vanish, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP`; `vanish` is the switch, `null` until a page has set it |
+| `watched {by}` | somebody opened the page on `/live` (`by: "live"`) or shared a screen from `/share` (`"share"`), or the last one left (`null`). Read from the `live.watching` and `share.watching` beats and sent on every change. While it is set the diary lets every pause go and refuses a send, and the main page says why |
+| `hello.ok {session, started_ms, now_ms, listening, live, vanish, watched, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP`; `vanish` is the switch, `null` until a page has set it; `watched` is as above |
 | `event {...DiaryEvent}` | one row of the timeline. An `ink` event is not a row: its `meta` is `{tool: "pen"\|"rubber", points: [[x, y], ...]}`, one stroke in panel pixels (1404x1872, portrait), and only `/share` draws it |
 | `pong {t}` | |
 | `diary {present, ago_ms, manager, busy}` | the half that owns the pen came, went, or is being started or stopped. Sent on every change |
@@ -163,7 +164,16 @@ The server rejects any rate but 16000 at the handshake.
 **Opening the socket asks for the feed and closing it ends it**, the same
 shape as `/ws/audio`. The server dials the tablet for the first page that
 opens one and hangs up after the last closes, so the tablet pays for the
-read only while somebody is looking. Nothing is read from the page.
+read only while somebody is looking. Nothing is read from the page but
+the browser's own pongs: the server pings every open socket every five
+seconds and drops one that has not answered in twenty, because a page that
+vanished without a close would otherwise count as somebody watching for as
+long as the server runs, and keep the diary's hands off the page for all of
+it.
+
+The page closes the socket while its tab is hidden and opens it again when
+the tab is shown. A browser keeps a background tab's socket open, and a Live
+tab left behind while you write in another would be the same stuck viewer.
 
 Without `RIDDLE_ALLOW_SNAP` the socket is closed at once with `1008` and
 the reason `RIDDLE_ALLOW_SNAP is not set`; a page should not redial that.

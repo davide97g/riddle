@@ -24,6 +24,7 @@ from riddle.mind import open as open_mind
 from riddle.mind.persona import Question
 from riddle.mind.memory import Memory
 from riddle.store import Store
+from riddle.store.db import WATCH_FRESH_MS
 
 PAGE_MARGIN = 70
 
@@ -35,7 +36,7 @@ TAP_TRAVEL = 25       # px of travel below which a stroke is a press, not a mark
 MIN_INK = 500         # px of travel before the page holds anything to answer
 MIN_SPAN = 110        # px of bounding box: a word is wider than a dot
 ERASE_RADIUS = 28     # px: an eraser pass this close takes the stroke with it
-LIVE_FRESH_MS = 15_000  # a live view's beat older than this has gone
+LIVE_FRESH_MS = WATCH_FRESH_MS  # a live view's beat older than this has gone
 
 BEAT_S = 5.0          # how often the loop says it is still here
 PUMP_S = 0.25         # how often intents are looked for, matching the page's poll

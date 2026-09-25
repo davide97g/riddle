@@ -17,6 +17,7 @@ import asyncio
 import base64
 import hashlib
 import struct
+import time
 
 # The magic string every websocket handshake is hashed against. A wrong one
 # still produces a well formed reply that only the browser rejects, so it is
@@ -56,6 +57,10 @@ class Socket:
         # One writer, many places that might want to send: the fan-out task,
         # the pong reply, the close. Frames must not interleave.
         self._lock = asyncio.Lock()
+        # When anything last arrived, pongs included. A socket that only
+        # ever sends has no other way to notice a peer that went away
+        # without closing: writes to it succeed until the buffer fills.
+        self.heard = time.monotonic()
 
     @classmethod
     async def upgrade(cls, reader, writer, headers: dict[str, str]) -> "Socket":
@@ -73,6 +78,7 @@ class Socket:
 
     async def _frame(self) -> tuple[bool, int, bytes]:
         head = await self.reader.readexactly(2)
+        self.heard = time.monotonic()
         fin = bool(head[0] & 0x80)
         if head[0] & 0x70:
             raise Closed("reserved bits set: an extension was negotiated")
@@ -176,6 +182,18 @@ class Socket:
             await self._send(TEXT, message.encode())
         else:
             await self._send(BINARY, message)
+
+    async def ping(self) -> None:
+        """Ask for a pong. A browser answers on its own, hidden tab or not,
+        and the answer is what moves `heard`."""
+        await self._send(PING, b"")
+
+    def abort(self) -> None:
+        """Drop the connection without a close frame, for a peer that has
+        stopped answering: a polite close would wait on a write it will
+        never read. The reader sees the end and returns None."""
+        self.open = False
+        self.writer.transport.abort()
 
     async def close(self, code: int = 1000, reason: str = "") -> None:
         if not self.open:

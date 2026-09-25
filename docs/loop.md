@@ -45,6 +45,8 @@ and all read at the moment a turn would start:
   beat younger than fifteen seconds as a person looking at the page -- which
   the diary must not rub out underneath them. A beat rather than a flag, so
   a voice server that dies with a page open cannot stop the diary for good.
+  Only while the Live tab is showing: hidden, it hangs up. The main page
+  says when this is why a pause was let go.
 - **Somebody is sharing a screen with the tablet.** While `/share` has a
   screen up it sends a `share` beat every five seconds, kept as
   `share.watching` and read the same way: the page is somebody's slide, and

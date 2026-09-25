@@ -154,7 +154,9 @@ does **not** need the diary running — the feed is its own ssh connection,
 so it keeps going while the loop is stopped, or busy drawing an answer.
 
 It opens no events socket, only `/ws/live`, and leaving it is what ends the
-feed. A landscape document arrives landscape: the server turns each frame
+feed -- and so is hiding its tab: the diary keeps its hands off the page
+while anybody watches, so a Live tab forgotten behind the Diary one would
+otherwise stop every answer. Show the tab again and it redials. A landscape document arrives landscape: the server turns each frame
 the way xochitl is showing it, and the page takes the frame's shape.
 
 **Paper** or **Ink**, beside Understand, is how a picture of the page is
@@ -261,6 +263,7 @@ running in a room with other people in it.
 | the meter never moves, and nothing is transcribed | a silent input is selected: pick another under the meter |
 | a TypeError about mediaDevices | not a secure context: `riddle voice share` |
 | the page says it has not been built | `riddle web build` |
+| Send is disabled and pauses are let go | the page is open on Live somewhere, or a screen is being shared; the line under the composer says which |
 | Send does nothing | the loop is not running; the intent waits, and expires after two minutes |
 | `parakeet failed` | check `parakeet-cli --help` and the model path |
 | transcripts in the wrong place | `riddle asr check` against a clip of known length |

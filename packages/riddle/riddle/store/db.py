@@ -35,6 +35,10 @@ KINDS = ("strokes", "speech", "shot", "reply", "note", "tool", "error", "ink")
 # a process that was killed outright never got to write it.
 STALE_MS = 60_000
 
+# A page's beat -- `live.watching`, `share.watching` -- older than this has
+# gone. Three beats of five seconds: one missed is a hiccup, not a departure.
+WATCH_FRESH_MS = 15_000
+
 # The schema is applied with CREATE ... IF NOT EXISTS, which means a new
 # column in schema.sql does nothing at all to a database that already exists
 # -- the first query against it simply raises "no such column". So each
@@ -535,6 +539,19 @@ class Store:
     def shared(self, within_ms: int) -> bool:
         seen = self.get_state("share.watching")
         return isinstance(seen, int) and 0 <= time.time() * 1000 - seen < within_ms
+
+    def watcher(self, within_ms: int = WATCH_FRESH_MS) -> str | None:
+        """Who is looking at the page, if anybody: `live`, `share` or None.
+
+        Either one keeps the diary's hands off the page, and the main page
+        says which, because a diary that silently lets every pause go looks
+        exactly like a broken one.
+        """
+        if self.watched(within_ms):
+            return "live"
+        if self.shared(within_ms):
+            return "share"
+        return None
 
     def intent(self, intent_id: int) -> dict | None:
         row = self.conn.execute(

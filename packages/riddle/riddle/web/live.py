@@ -23,6 +23,7 @@ the browser already has costs a phone its data plan.
 import asyncio
 import io
 import json
+import time
 import zlib
 
 from riddle.device import screen
@@ -32,6 +33,7 @@ FRAME_S = 15.0  # a frame slower than this is a dead link, not a slow one
 RETRY_S = 5.0   # between dials while the tablet does not answer
 SEND_S = 5.0    # how long one page may take a frame before it is dropped
 BEAT_S = 5.0    # how often the store hears that somebody is still watching
+QUIET_S = 20.0  # a page that has not answered a ping in this long has gone
 CHUNK = 1 << 16
 
 
@@ -131,9 +133,36 @@ class Live:
         is still dialling a sleeping tablet is somebody waiting to see the
         page, and the diary must not use those seconds to rub it out.
         """
-        while self.viewers:
+        while True:
+            await self.prune()
+            if not self.viewers:
+                break
             self._told(True)
             await asyncio.sleep(BEAT_S)
+
+    async def prune(self) -> None:
+        """Ping every page, and let go of any that stopped answering.
+
+        The page sends nothing, so a connection whose far end vanished
+        without a close -- a phone that lost its signal, a proxy that forgot
+        to pass the close on -- would otherwise be a viewer for as long as
+        the server runs, and the diary would keep its hands off the page for
+        all of it. The browser answers pings by itself; not hearing one for
+        a few beats is somebody who is not there.
+        """
+        clock = time.monotonic()
+        for sock in list(self.viewers):
+            if clock - sock.heard > QUIET_S:
+                self.viewers.discard(sock)
+                sock.abort()
+                print("live: dropped a page that stopped answering", flush=True)
+                continue
+            try:
+                await asyncio.wait_for(sock.ping(), SEND_S)
+            except (asyncio.TimeoutError, OSError):
+                self.viewers.discard(sock)
+                sock.abort()
+                print("live: dropped a page that stopped reading", flush=True)
 
     def _told(self, on: bool) -> None:
         try:
@@ -231,4 +260,5 @@ class Live:
         for sock, outcome in zip(live, done):
             if isinstance(outcome, BaseException):
                 self.viewers.discard(sock)
+                sock.abort()
                 print(f"live: dropped a page: {outcome!r}", flush=True)

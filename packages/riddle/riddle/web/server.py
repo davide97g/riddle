@@ -46,6 +46,9 @@ class Hub:
         # the callable that says what is true. Set by the server; `None` until
         # then, so the first tick always says it once.
         self.diary_was: bool | None = None
+        # Who has the page open on /live or /share, as last told. Starts
+        # unknown rather than None so the first poll says it either way.
+        self.watcher_was: str | None | bool = False
         self.diary_now = None
 
     async def say(self, message: dict) -> None:
@@ -113,7 +116,16 @@ class Hub:
 
         Only on a change. It is a broadcast, and the answer is the same four
         times a second.
+
+        Who is watching the page rides along for the same reason: the diary
+        keeps its hands off while somebody is, the beat that says so changes
+        with no page asking, and the main page has to be told why its pauses
+        are being let go.
         """
+        watcher = self.store.watcher()
+        if watcher != self.watcher_was:
+            self.watcher_was = watcher
+            await self.say({"type": "watched", "by": watcher})
         if self.diary_now is None:
             return
         state = self.diary_now()
@@ -422,6 +434,7 @@ class Server:
             "listening": self.ears is not None,
             "live": config.get().allow_snap,
             "vanish": self.store.vanish(),
+            "watched": self.store.watcher(),
             "diary": self.diary(),
         }
 

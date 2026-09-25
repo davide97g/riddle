@@ -43,7 +43,7 @@ export function Composer() {
         />
         <Button
           onClick={send}
-          disabled={offline || !state.diary.present || !state.vanish}
+          disabled={offline || !state.diary.present || !state.vanish || state.watched !== null}
           className="h-11 transition-transform duration-150 ease-out active:scale-[0.97] disabled:active:scale-100"
         >
           Send
@@ -67,11 +67,15 @@ export function Composer() {
         {/* Keyed on the sentence: the reason you cannot send changes while
             you are reading it, and a swap without a fade reads as a glitch. */}
         <p
-          key={`${state.diary.present}-${state.listening}-${state.vanish}`}
+          key={`${state.diary.present}-${state.listening}-${state.vanish}-${state.watched}`}
           className="row-in text-center text-xs text-muted-foreground"
         >
           {!state.vanish
             ? 'Vanishing is off: what you write stays on the page, and the diary does not answer.'
+            : state.watched === 'live'
+            ? 'The page is open on Live, so the diary leaves it alone. Close Live to write to it.'
+            : state.watched === 'share'
+            ? 'A screen is being shared with the tablet, so the diary leaves the page alone.'
             : !state.diary.present
             ? 'The diary is not running, so nothing would answer a send.'
             : !state.listening

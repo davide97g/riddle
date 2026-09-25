@@ -1,4 +1,4 @@
-import type { DiaryEvent, DiaryPresence, Row, ServerMessage } from '@/lib/protocol'
+import type { DiaryEvent, DiaryPresence, Row, ServerMessage, Watcher } from '@/lib/protocol'
 
 export type Conn = 'connecting' | 'open' | 'closed'
 
@@ -23,6 +23,8 @@ export type State = {
   vanish: boolean
   /** whether the server had a value for it, or only the default */
   vanishKnown: boolean
+  /** somebody has the page open, so the diary keeps its hands off it */
+  watched: Watcher
   /** whether the half that owns the pen is running */
   diary: DiaryPresence
   conn: Conn
@@ -45,6 +47,7 @@ export const initial: State = {
   live: false,
   vanish: true,
   vanishKnown: false,
+  watched: null,
   diary: { present: false, ago_ms: null, manager: 'here', busy: false },
   conn: 'connecting',
   draft: '',
@@ -150,6 +153,7 @@ export function reduce(state: State, action: Action): State {
           live: msg.live ?? false,
           vanish: msg.vanish ?? state.vanish,
           vanishKnown: typeof msg.vanish === 'boolean',
+          watched: msg.watched ?? null,
           diary: msg.diary ?? state.diary,
         }
       }
@@ -159,6 +163,9 @@ export function reduce(state: State, action: Action): State {
       }
       if (msg.type === 'vanish') {
         return { ...state, vanish: msg.on, vanishKnown: true }
+      }
+      if (msg.type === 'watched') {
+        return { ...state, watched: msg.by }
       }
       if (msg.type === 'hearing') {
         return { ...state, hearing: msg.on }

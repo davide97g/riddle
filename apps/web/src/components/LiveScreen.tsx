@@ -57,7 +57,9 @@ export function LiveScreen({
         ? `lost the tablet${live.message ? `: ${live.message}` : ''} · redialling`
         : live.state === 'refused'
           ? `the server will not read the screen${live.message ? `: ${live.message}` : ''}`
-          : 'dialing the tablet'
+          : live.state === 'off'
+            ? 'paused while this tab is hidden'
+            : 'dialing the tablet'
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 py-3">

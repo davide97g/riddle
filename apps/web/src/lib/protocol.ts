@@ -47,6 +47,10 @@ export type DiaryPresence = {
   busy: boolean
 }
 
+/** who is looking at the page on the tablet: somebody on /live, a screen
+ *  shared from /share, or nobody */
+export type Watcher = 'live' | 'share' | null
+
 export type ServerMessage =
   | ({ type: 'event' } & DiaryEvent)
   | {
@@ -61,6 +65,8 @@ export type ServerMessage =
       /** whether the diary takes the ink off and answers after a pause.
        *  null until any page has set it, which the diary reads as yes */
       vanish: boolean | null
+      /** who has the page open, which keeps the diary's hands off it */
+      watched: Watcher
       diary: DiaryPresence
     }
   /** a send was recorded, and this is its id. the reply carries the same id
@@ -72,6 +78,9 @@ export type ServerMessage =
   | { type: 'pong'; t: number }
   /** the switch was turned, from this page or another */
   | { type: 'vanish'; on: boolean }
+  /** somebody opened the page on /live or /share, or the last one left.
+   *  While `by` is set the diary lets every pause go and refuses a send */
+  | { type: 'watched'; by: Watcher }
   /** the gate opened or closed: somebody is speaking, or has stopped */
   | { type: 'hearing'; on: boolean }
   /** a sentence is being read. there is no partial text to show, because the
