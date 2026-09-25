@@ -46,7 +46,7 @@ function captureSrc(path: string) {
  *  white background against a light theme, and inverting first turns the ink
  *  white so screen can drop the black against a dark one. Either way what is
  *  left is the ink, sitting on the card like any other row. */
-const INK = 'mix-blend-multiply dark:invert dark:mix-blend-screen'
+export const INK = 'mix-blend-multiply dark:invert dark:mix-blend-screen'
 
 /** The page is the whole point of a strokes row, so it is shown as large as
  *  the card allows and opens full size on a tap. A capture that has been

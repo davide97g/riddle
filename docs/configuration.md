@@ -58,6 +58,7 @@ nothing reads, a value of the wrong type, and a stale example file.
 | `RIDDLE_VAD_FLOOR` | `0.012` | the voice server | The quietest thing the gate will call speech. Too low and the fridge is transcribed; too high and quiet speech is lost. |
 | `RIDDLE_VAD_HANG_MS` | `700` | the voice server | Silence before an utterance is considered finished. Too short and sentences are cut mid-clause. |
 | `RIDDLE_VAD_MAX_MS` | `20000` | the voice server | Forced cut. Somebody is monologuing. |
+| `RIDDLE_LIVE_MS` | `1000` | the voice server | How often the live view reads the tablet's screen while a page is watching it. Each read is about half a second of the tablet's own CPU, so faster costs battery. Needs RIDDLE_ALLOW_SNAP. |
 | `RIDDLE_AUDIO_KEEP_DAYS` | `7` | the voice server | How long recordings of your room stay on disk. 0 keeps them forever, which is a decision worth making on purpose. |
 
 ## the client's build

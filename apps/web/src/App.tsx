@@ -3,6 +3,7 @@ import { Composer } from '@/components/Composer'
 import { ConnectionBadge } from '@/components/ConnectionBadge'
 import { DiaryButton } from '@/components/DiaryButton'
 import { EraseButton } from '@/components/EraseButton'
+import { LiveButton } from '@/components/LiveButton'
 import { Splash } from '@/components/Splash'
 import { Timeline } from '@/components/Timeline'
 import { Wordmark } from '@/components/Wordmark'
@@ -30,6 +31,7 @@ export default function App() {
         </h1>
         <div className="flex items-center gap-2">
           <DiaryButton />
+          <LiveButton />
           <ConnectionBadge />
           <EraseButton />
         </div>

@@ -146,3 +146,15 @@ The loop answers to that same switch rather than a second one. With
 `RIDDLE_ALLOW_SNAP=1` it photographs the whole page once per turn, between
 the pause and the eraser, and offers it to the model as `look_at_page`; see
 [loop.md](loop.md). Without it, the loop never reads the screen.
+
+So does the page's live view, which is the same read on a loop: one ssh
+connection held open by the voice server, running
+`while read x; do dd ... | gzip -1 -c; done`. The host sends a newline for
+each frame it wants, so it paces the tablet rather than a `sleep` over
+there, and there is never more than one frame in flight. Each frame is its
+own gzip member, which is the whole framing: no length prefix and no
+temporary file on the tablet. Each costs the tablet about half a second of
+dd and gzip, which is why `RIDDLE_LIVE_MS` defaults to a second and why the
+connection is only up while a page is watching. A restarted xochitl leaves
+the stream reading a dead pid; the empty frame that comes back is rejected
+as a short read and the stream redials, finding the new one.

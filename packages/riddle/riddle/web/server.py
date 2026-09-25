@@ -1,6 +1,6 @@
 """The page you speak into, and the socket it speaks over.
 
-This process never touches the tablet. It reads and writes the store, and the
+This process never touches the pen. It reads and writes the store, and the
 loop -- which owns the ssh pipe -- picks up anything that wants ink by draining
 the `intents` table. That is why there is no lock anywhere here and no second
 `Device`: the two halves share a file, not a device.
@@ -8,6 +8,8 @@ the `intents` table. That is why there is no lock anywhere here and no second
 Everything the page shows is derived by tailing the store rather than by being
 told. One code path serves the live feed and the history, so a reload
 reconstructs the screen from the same query that fills it in the first place.
+`/ws/live` is the exception, and not from the store at all: it is the tablet's
+screen, read by `riddle.web.live` over an ssh of its own.
 """
 
 import json
@@ -17,7 +19,7 @@ import urllib.parse
 from pathlib import Path
 
 from riddle import config, process
-from riddle.web import auth, wsock
+from riddle.web import auth, live, wsock
 
 POLL_S = 0.25  # how often the store is tailed for anything new
 SEND_S = 5.0   # how long one page may take a frame before it is dropped
@@ -133,6 +135,9 @@ class Server:
         # Off unless a password is set, which is the loopback case: reaching
         # the port already means reaching the machine.
         self.gate = auth.Gate(config.get().web_password)
+        # The page as it is on the tablet, for whoever opens /ws/live. It
+        # dials nothing until somebody does.
+        self.live = live.Live(config.get().ssh_host, config.get().live_ms)
 
     # --- http ------------------------------------------------------------
 
@@ -278,6 +283,8 @@ class Server:
             await self.control(sock)
         elif path == "/ws/audio":
             await self.audio(sock, query)
+        elif path == "/ws/live":
+            await self.watch(sock)
         else:
             await sock.close(1003, "no such socket")
 
@@ -293,6 +300,19 @@ class Server:
             await sock.close(1003, "not json")
         finally:
             self.hub.control.discard(sock)
+
+    async def watch(self, sock: wsock.Socket) -> None:
+        """The tablet's screen, about once a second, until the page closes.
+
+        Behind the same switch as `riddle snap`: this reads another process's
+        memory on the tablet, and a page being able to ask for it is not the
+        same thing as somebody having said it may. Checked per socket rather
+        than once, so the switch is what it says in `.env` now.
+        """
+        if not config.get().allow_snap:
+            await sock.close(1008, "RIDDLE_ALLOW_SNAP is not set")
+            return
+        await self.live.watch(sock)
 
     def diary(self) -> dict:
         """Whether the half that owns the pen is running, and who runs it.
@@ -317,6 +337,7 @@ class Server:
             "now_ms": self.store.now_ms(),
             "started_ms": self.store.started_ms,
             "listening": self.ears is not None,
+            "live": config.get().allow_snap,
             "diary": self.diary(),
         }
 

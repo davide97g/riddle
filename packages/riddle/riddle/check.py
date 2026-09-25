@@ -73,7 +73,8 @@ def messages() -> list[str]:
     problems = []
     server = _text("packages", "riddle", "riddle", "web", "server.py")
     sent = set(re.findall(r'"type":\s*"([\w.]+)"', server))
-    sent |= set(re.findall(r'"type": "([\w.]+)"', _text("packages", "riddle", "riddle", "voice", "ears.py")))
+    for module in (("voice", "ears.py"), ("web", "live.py")):
+        sent |= set(re.findall(r'"type": "([\w.]+)"', _text("packages", "riddle", "riddle", *module)))
 
     protocol = _text("apps", "web", "src", "lib", "protocol.ts")
     known = set(re.findall(r"type:\s*'([\w.]+)'", protocol))

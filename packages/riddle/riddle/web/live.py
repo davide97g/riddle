@@ -1,0 +1,169 @@
+"""The page as it is right now, about once a second, for whoever is watching.
+
+No model and no pen. This is the screen read from `riddle.device.screen` put
+on a loop and handed to the browser: you write on the tablet and a phone
+across the room shows it a second later, whether the diary is running or not.
+
+It lives in this process rather than in the loop for two reasons. The loop
+blocks for seconds at a time drawing, and a view of the page that froze
+whenever an answer was being written would be a view of the wrong thing. And
+a screen read is its own ssh connection that never touches the agent, so
+this process can hold one without constructing a `Device` -- the pen pipe
+stays the loop's alone.
+
+Only while somebody watches. A frame is about half a second of dd and gzip
+on the tablet, which is battery on a device that is otherwise asleep, so the
+first viewer dials and the last one to leave hangs up.
+
+Only frames that changed are sent. A page nobody is writing on is the same
+10.5MB every second; comparing it here is a memcmp, and resending a frame
+the browser already has costs a phone its data plan.
+"""
+
+import asyncio
+import io
+import json
+import zlib
+
+from riddle.device import screen
+from riddle.device.ssh import INTERACTIVE
+
+FRAME_S = 15.0  # a frame slower than this is a dead link, not a slow one
+RETRY_S = 5.0   # between dials while the tablet does not answer
+SEND_S = 5.0    # how long one page may take a frame before it is dropped
+CHUNK = 1 << 16
+
+
+def encode(raw: bytes) -> bytes:
+    """One read of the painted buffer as the png a browser is sent."""
+    buf = io.BytesIO()
+    screen.frame(raw).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+class Live:
+    """Everyone watching the page, and the one connection that feeds them."""
+
+    def __init__(self, host: str, every_ms: int) -> None:
+        self.host = host
+        self.every = every_ms / 1000
+        self.viewers: set = set()
+        # The newest frame, so a page that arrives mid-stream is not blank
+        # until somebody next moves the pen.
+        self.png: bytes | None = None
+        self.state: dict = {"type": "live", "state": "dialing"}
+        self.task: asyncio.Task | None = None
+
+    async def watch(self, sock) -> None:
+        """Hold one page on the feed until it goes away."""
+        self.viewers.add(sock)
+        try:
+            await sock.send(json.dumps(self.state))
+            if self.png is not None:
+                await sock.send(self.png)
+            if self.task is None or self.task.done():
+                self.task = asyncio.create_task(self.run())
+            # Nothing is expected from the page. Reading is what answers its
+            # pings and notices it close.
+            async for _ in sock:
+                pass
+        finally:
+            self.viewers.discard(sock)
+            if not self.viewers:
+                self.hang_up()
+
+    def hang_up(self) -> None:
+        if self.task is not None:
+            self.task.cancel()
+            self.task = None
+        # The page will have changed by the time anybody looks again.
+        self.png = None
+        self.state = {"type": "live", "state": "dialing"}
+
+    async def run(self) -> None:
+        """Keep a feed up for as long as anybody is watching.
+
+        A dropped link is waited out the way the loop waits one out: the
+        tablet sleeps and roams, and a view left open on a phone should find
+        the page again when it wakes rather than needing a reload.
+        """
+        while self.viewers:
+            try:
+                await self.feed()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 - a dead link, said out loud
+                print(f"live: {exc}", flush=True)
+                await self.tell("lost", str(exc))
+                await asyncio.sleep(RETRY_S)
+
+    async def feed(self) -> None:
+        if self.state["state"] != "dialing":
+            await self.tell("dialing")
+        proc = await asyncio.create_subprocess_exec(
+            "ssh", *INTERACTIVE, self.host, screen.STREAM,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        clock = asyncio.get_running_loop()
+        last = None
+        try:
+            while self.viewers:
+                began = clock.time()
+                proc.stdin.write(b"\n")
+                await proc.stdin.drain()
+                raw = await asyncio.wait_for(self.member(proc), FRAME_S)
+                if self.state["state"] != "on":
+                    await self.tell("on")
+                if raw != last:
+                    last = raw
+                    # Off the event loop: a png of the whole page is tens of
+                    # milliseconds, and this loop also delivers the timeline.
+                    self.png = await asyncio.to_thread(encode, raw)
+                    await self.fan(self.png)
+                await asyncio.sleep(max(0.0, self.every - (clock.time() - began)))
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+            await proc.wait()
+
+    async def member(self, proc) -> bytes:
+        """One frame: exactly one gzip member off the stream."""
+        unzip = zlib.decompressobj(wbits=31)
+        out = []
+        while not unzip.eof:
+            chunk = await proc.stdout.read(CHUNK)
+            if not chunk:
+                said = (await proc.stderr.read()).decode(errors="replace").strip()
+                # The last line: ssh says why it gave up at the end, and the
+                # page has one line to say it in. The log gets the rest.
+                if said:
+                    print(f"live: {said}", flush=True)
+                raise RuntimeError(said.splitlines()[-1] if said else "the tablet hung up")
+            out.append(await asyncio.to_thread(unzip.decompress, chunk))
+        return b"".join(out)
+
+    async def tell(self, state: str, message: str | None = None) -> None:
+        self.state = {"type": "live", "state": state}
+        if message:
+            self.state["message"] = message
+        await self.fan(json.dumps(self.state))
+
+    async def fan(self, message: str | bytes) -> None:
+        """To every page at once, each on a deadline, as `Hub.say` does.
+
+        A phone that stopped reading must not hold up the frame everybody
+        else is waiting for.
+        """
+        live = [sock for sock in self.viewers if sock.open]
+        if not live:
+            return
+        done = await asyncio.gather(
+            *(asyncio.wait_for(sock.send(message), SEND_S) for sock in live),
+            return_exceptions=True,
+        )
+        for sock, outcome in zip(live, done):
+            if isinstance(outcome, BaseException):
+                self.viewers.discard(sock)
+                print(f"live: dropped a page: {outcome!r}", flush=True)

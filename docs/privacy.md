@@ -58,6 +58,11 @@ One company, and it is worth knowing what it sees.
   only hands back a picture of your own page: the diary searches nothing,
   fetches nothing, and cannot see anything on this machine that a turn did
   not hand it.
+- **The live view sends your whole page to whoever opens it**, about once
+  a second, as long as they keep it open. Frames are held in memory and
+  never written to disk. Behind the tunnel that is to anybody with the
+  password, so the password is guarding your notebook as well as your pen.
+  Without `RIDDLE_ALLOW_SNAP=1` it is refused.
 - Nothing else. The server binds loopback; `riddle voice share` exposes it
   only on your own tailnet, behind a certificate.
 

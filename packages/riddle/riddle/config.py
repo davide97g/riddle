@@ -128,6 +128,11 @@ SETTINGS: tuple[Setting, ...] = (
             "and sentences are cut mid-clause."),
     Setting("RIDDLE_VAD_MAX_MS", "vad_max_ms", int, 20000, "voice",
             "Forced cut. Somebody is monologuing."),
+    Setting("RIDDLE_LIVE_MS", "live_ms", int, 1000, "voice",
+            "How often the live view reads the tablet's screen while a page "
+            "is watching it. Each read is about half a second of the "
+            "tablet's own CPU, so faster costs battery. Needs "
+            "RIDDLE_ALLOW_SNAP."),
     Setting("RIDDLE_AUDIO_KEEP_DAYS", "audio_keep_days", int, 7, "voice",
             "How long recordings of your room stay on disk. 0 keeps them "
             "forever, which is a decision worth making on purpose."),
@@ -188,6 +193,7 @@ class Config:
     vad_floor: float
     vad_hang_ms: int
     vad_max_ms: int
+    live_ms: int
     audio_keep_days: int
     server: str
     tailnet: bool

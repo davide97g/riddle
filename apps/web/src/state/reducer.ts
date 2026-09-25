@@ -17,6 +17,8 @@ export type State = {
   serverNowMs: number | null
   greetedAt: number | null
   listening: boolean
+  /** whether the server will stream the tablet's screen */
+  live: boolean
   /** whether the half that owns the pen is running */
   diary: DiaryPresence
   conn: Conn
@@ -36,6 +38,7 @@ export const initial: State = {
   serverNowMs: null,
   greetedAt: null,
   listening: false,
+  live: false,
   diary: { present: false, ago_ms: null, manager: 'here', busy: false },
   conn: 'connecting',
   draft: '',
@@ -138,6 +141,7 @@ export function reduce(state: State, action: Action): State {
           serverNowMs: msg.now_ms,
           greetedAt: performance.now(),
           listening: msg.listening,
+          live: msg.live ?? false,
           diary: msg.diary ?? state.diary,
         }
       }

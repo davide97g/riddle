@@ -46,6 +46,9 @@ export type ServerMessage =
       started_ms: number
       now_ms: number
       listening: boolean
+      /** whether this server will stream the tablet's screen on /ws/live,
+       *  which is RIDDLE_ALLOW_SNAP and nothing else */
+      live: boolean
       diary: DiaryPresence
     }
   /** a send was recorded, and this is its id. the reply carries the same id
@@ -76,6 +79,15 @@ export type ClientMessage =
    *  it arrived. Only a failure comes back, as `error` */
   | { type: 'diary.start' }
   | { type: 'diary.stop' }
+
+/** The text half of /ws/live; the binary half is one png per changed frame.
+ *  `dialing` until the tablet answers, `on` while frames arrive, `lost` when
+ *  the link dropped and the server is redialling by itself. */
+export type LiveMessage = {
+  type: 'live'
+  state: 'dialing' | 'on' | 'lost'
+  message?: string
+}
 
 /** A row on screen: either something the server told us, or something we have
  *  said but not yet seen come back. */

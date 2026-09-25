@@ -46,7 +46,8 @@ pass before and after anything structural.
   must too. The taps live in `taps.json` (tracked) and are re-recorded with
   `riddle taps learn pen --yes`.
 - **The voice process never constructs a `Device`.** The loop owns the ssh
-  pipe. Anything else that wants ink pushes an intent.
+  pipe. Anything else that wants ink pushes an intent. Its one ssh is
+  `web/live.py`'s screen read, which never touches the agent.
 - **Never call a `Store` method from a `to_thread` worker.** One connection,
   one thread; sqlite3 enforces it. Off-thread work posts its result back.
 - **No write transaction across a subprocess call, a network wait or a

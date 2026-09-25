@@ -36,7 +36,7 @@ from riddle.device.ssh import BASE as SSH_OPTIONS
 # busybox on the tablet: no pidof -s, no python, no lz4. gzip -1 takes the
 # 10.5MB frame down to about 36KB in half a second, which is far cheaper than
 # sending it raw down a usb-ethernet link.
-REMOTE = (
+_FIND = (
     'PID=$(pidof xochitl | cut -d" " -f1); '
     '[ -n "$PID" ] || { echo "xochitl not running" >&2; exit 1; }; '
     'MAP=$(grep -C1 /dev/fb0 /proc/$PID/maps | tail -n1); '
@@ -44,9 +44,22 @@ REMOTE = (
     'END=$(echo "$MAP" | sed "s/^[^-]*-//;s/ .*//"); '
     '[ $(( 0x$END - 0x$BASE )) -ge %d ] || '
     '{ echo "framebuffer map too small; firmware layout changed" >&2; exit 2; }; '
+) % (SKIP + BYTES)
+_READ = (
     "dd if=/proc/$PID/mem bs=4096 skip=$(( (0x$BASE + %d) / 4096 )) "
     "count=%d 2>/dev/null | gzip -1 -c"
-) % (SKIP + BYTES, SKIP, PAGES)
+) % (SKIP, PAGES)
+
+REMOTE = _FIND + _READ
+
+# The same read on one long-lived connection, one frame per line on stdin.
+# The host paces it rather than a `sleep` over there, so there is never more
+# than one frame in flight, and a host that stops asking costs the tablet
+# nothing. Each frame is its own gzip member, which is the framing: the
+# stream needs no length prefix and the tablet writes no temporary file. A
+# restarted xochitl leaves $PID stale, dd reads nothing, and the empty member
+# that comes back is a short frame the host rejects and redials.
+STREAM = _FIND + "while read x; do " + _READ + "; done"
 
 
 def grab(host: str = "rm2", timeout: int = 30) -> Image.Image:
@@ -62,7 +75,11 @@ def grab(host: str = "rm2", timeout: int = 30) -> Image.Image:
     if done.returncode != 0:
         raise RuntimeError(done.stderr.decode().strip() or "could not read the screen")
 
-    raw = gzip.decompress(done.stdout)
+    return frame(gzip.decompress(done.stdout))
+
+
+def frame(raw: bytes) -> Image.Image:
+    """One decompressed read of the painted buffer, as greyscale."""
     if len(raw) < BYTES:
         raise RuntimeError(f"short read: {len(raw)} of {BYTES} bytes")
 

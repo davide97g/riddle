@@ -18,10 +18,14 @@ Two processes and one small C program, sharing one sqlite file.
                                        │ writes speech, notes
                                        │ leaves intents
  ┌────────────┐            ┌───────────┴──────────────┐
- │  a phone   │◄──https───►│  riddle voice            │   never opens ssh,
- │  (browser) │  tailscale │  (riddle.apps.voice)     │   never draws
+ │  a phone   │◄──https───►│  riddle voice            │   never opens the pen
+ │  (browser) │  tailscale │  (riddle.apps.voice)     │   pipe, never draws
  └────────────┘            └──────────────────────────┘
 ```
+
+The one ssh the voice server does open is the live view's: a read of the
+screen on a loop, up only while a page is watching, which never touches the
+agent. See [voice.md](voice.md#watching-the-page-live).
 
 The two halves **share a file, not a device**. That is the whole design: the
 loop owns the ssh pipe and blocks for seconds at a time drawing, so a web
@@ -56,7 +60,7 @@ Everything Python is one installable package, `packages/riddle/riddle`.
 | `riddle.mind` | who answers. `openai` (one http call per turn with the new writing attached to it, and a second only if the model calls `look_at_page` for the rest of the page), `persona` (the words, which outlived the two models that said them before), `memory` (the lines that survive a reset) |
 | `riddle.store` | `db` and `schema.sql` |
 | `riddle.voice` | `ears`: the energy gate and the speech model |
-| `riddle.web` | `server` (http and websockets) and `wsock` (enough RFC 6455 for one browser) |
+| `riddle.web` | `server` (http and websockets), `wsock` (enough RFC 6455 for one browser) and `live` (the screen read on a loop, for a page watching the tablet) |
 | `riddle.apps` | `diary` and `voice`, the two processes |
 | `riddle.tools` | the operator commands the CLI dispatches to |
 | top level | `paths`, `config`, `consent`, `process` (both halves in the background), `dev` (both halves plus the client's dev server, here, reloaded on save), `toolchain` (how `bun` is invoked), `tailnet`, `probe`, `doctor`, `cli` |

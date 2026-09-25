@@ -11,8 +11,10 @@ done by reading and injecting raw pen events, so as far as the reMarkable's
 own software is concerned, something invisible is holding a second stylus.
 
 There is also a second half: a page you can open on your phone, speak into,
-and ask the diary for an answer from. It never touches the tablet — it leaves
-a note in a small shared database and the first half picks it up.
+and ask the diary for an answer from. It never touches the pen — it leaves
+a note in a small shared database and the first half picks it up. It can
+also just watch: with `RIDDLE_ALLOW_SNAP=1`, `/live` shows the page on the
+tablet live, about once a second, with no model involved.
 
 Both halves run on a mini PC on the LAN rather than on a laptop, and the page
 is published on a Cloudflare tunnel — the tablet is not, and cannot be: ink
@@ -26,6 +28,7 @@ riddle diary   owns the ssh pipe to the tablet. Watches the page, decides
 
 riddle voice   a page you speak into, served on loopback. Records,
                transcribes, shows a timeline, and asks the diary for a turn.
+               Or shows the tablet's screen live, read-only.
 ```
 
 They share one sqlite file and no device. Either can run alone.

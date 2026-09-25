@@ -3,9 +3,10 @@
 
 Run this alongside the loop. It records what is said into the same store the
 loop writes strokes to, and asks for a turn by leaving an intent the loop
-picks up. It never opens an ssh connection and never draws: the two halves
+picks up. It never opens the pen's pipe and never draws: the two halves
 share a file, not a device, which is why there is no lock anywhere here and
-no second Device.
+no second Device. Its only ssh is `riddle.web.live`, which reads the screen
+for a page that is watching it.
 
 The server binds loopback only. `riddle voice share` puts a real certificate
 in front of it, which is not decoration: a browser will not hand out a

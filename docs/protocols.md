@@ -72,14 +72,14 @@ is routed.
 | Route | Returns |
 |---|---|
 | `GET /api/health` | `{ok, session}` |
-| `GET /api/state` | `{session, started_ms, now_ms, listening, diary:{present, ago_ms, manager, busy}}` |
+| `GET /api/state` | `{session, started_ms, now_ms, listening, live, diary:{present, ago_ms, manager, busy}}` |
 | `GET /api/events?since=&limit=` | `{events:[DiaryEvent]}`, limit capped at 500 |
 | `GET /api/captures/<name>` | a png from `var/captures`, path-traversal checked on the resolved path |
 | `GET /api/intent/<id>` | `{id, state, result}` |
 | `POST /api/note` | `{id}` — records a typed note |
 | `POST /api/send` | `{intent, diary}` — asks the diary for a turn |
 | `POST /api/login` | form-encoded `password`; `303` to `/` with the cookie, or the form again with `401` |
-| anything else | the built client, with index as the fallback so routing works |
+| anything else | the built client, with index as the fallback so routing works: `/live` is the live page, anything else the timeline |
 
 There is deliberately **no route for `var/audio`**. Those files are a
 recording of a room.
@@ -114,7 +114,7 @@ Server to client:
 
 | Message | Meaning |
 |---|---|
-| `hello.ok {session, started_ms, now_ms, listening, diary}` | the greeting |
+| `hello.ok {session, started_ms, now_ms, listening, live, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP` |
 | `event {...DiaryEvent}` | one row of the timeline |
 | `pong {t}` | |
 | `diary {present, ago_ms, manager, busy}` | the half that owns the pen came, went, or is being started or stopped. Sent on every change |
@@ -152,6 +152,28 @@ silence from the sequence number, up to five seconds, because a gap is
 something that happened in the room rather than something to paper over.
 
 The server rejects any rate but 16000 at the handshake.
+
+### `/ws/live` — the tablet's screen, outbound only
+
+**Opening the socket asks for the feed and closing it ends it**, the same
+shape as `/ws/audio`. The server dials the tablet for the first page that
+opens one and hangs up after the last closes, so the tablet pays for the
+read only while somebody is looking. Nothing is read from the page.
+
+Without `RIDDLE_ALLOW_SNAP` the socket is closed at once with `1008` and
+the reason `RIDDLE_ALLOW_SNAP is not set`; a page should not redial that.
+
+Server to client, two kinds of frame:
+
+| Frame | Meaning |
+|---|---|
+| binary | one png, the whole screen, 1404x1872 greyscale. Sent only when it differs from the last one, so silence means an unchanged page, not a dead feed |
+| text `live {state, message?}` | `dialing` until the tablet answers, `on` while frames arrive, `lost` with the reason when the link dropped. A lost feed is redialled by the server every five seconds while anyone is watching |
+
+A page that opens mid-stream is sent the state and then the newest frame, so
+it is never blank until somebody next moves the pen. Frames are paced by
+`RIDDLE_LIVE_MS`, one second by default; see [device.md](device.md#reading-the-screen)
+for the tablet's side.
 
 ## When you change any of this
 

@@ -4,9 +4,11 @@
 transcribes it, shows a timeline of everything that happened, and asks the
 diary for an answer when you press Send.
 
-It **never opens an ssh connection and never draws**. The loop owns the pen;
+It **never opens the pen's pipe and never draws**. The loop owns the pen;
 this half leaves a note in the store and the loop picks it up. That is why
-there is no lock anywhere in it and no second `Device`.
+there is no lock anywhere in it and no second `Device`. Its one ssh
+connection is the live view's, which only ever reads the screen, and only
+while a page is watching it.
 
 ## Why it is a separate process
 
@@ -138,6 +140,27 @@ This is worth checking first when nothing is transcribed: a recording from a
 silent input reaches the server, is gated as silence and produces no
 utterance at all, which looks exactly like a broken model.
 
+## Watching the page live
+
+`/live` is a page of its own: the page on the tablet, as it is right now,
+about once a second. The eye in the header goes there. There is no model in
+it and nothing is drawn back: you write on the tablet and the phone shows
+it. It has no control that reaches the pen, so it can be left open on a
+second screen or handed to somebody who should see the notebook without
+being able to send, erase or stop anything. It needs
+`RIDDLE_ALLOW_SNAP=1` on the server, because it reads the screen the way
+`riddle snap` does, and without it the eye is disabled and says why. It
+does **not** need the diary running — the feed is its own ssh connection,
+so it keeps going while the loop is stopped, or busy drawing an answer.
+
+It opens no events socket, only `/ws/live`, and leaving it is what ends the
+feed. Only frames that changed are sent, so the line above the page says when it
+last changed rather than when it was last read. A frame is a torn read:
+the stroke being drawn as it is taken can come out half finished, and is
+whole in the next one. The wire is in
+[protocols.md](protocols.md#wslive--the-tablets-screen-outbound-only) and
+the tablet's side in [device.md](device.md#reading-the-screen).
+
 ## What is written down
 
 `var/audio/*.wav` are recordings of your room, pruned after
@@ -150,6 +173,8 @@ running in a room with other people in it.
 | what you see | why |
 |---|---|
 | mic button disabled | no speech model, or the diary is offline, or the socket is closed |
+| the eye is disabled | `RIDDLE_ALLOW_SNAP` is not set on the server |
+| the live view says it lost the tablet | the tablet is asleep or off the network; it redials by itself |
 | the meter never moves, and nothing is transcribed | a silent input is selected: pick another under the meter |
 | a TypeError about mediaDevices | not a secure context: `riddle voice share` |
 | the page says it has not been built | `riddle web build` |
