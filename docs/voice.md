@@ -171,6 +171,22 @@ whole in the next one. The wire is in
 [protocols.md](protocols.md#wslive--the-tablets-screen-outbound-only) and
 the tablet's side in [device.md](device.md#reading-the-screen).
 
+## Putting a document on the tablet
+
+The file button in the header of both pages -- or a file dropped anywhere on
+either -- puts a pdf, an epub or an image in the tablet's library as a real
+document, rendered by xochitl itself rather than traced by the pen: sharp at
+every zoom, and a page you can write on. An image becomes a one-page pdf in
+greys; the rest goes in as it is. The dialog takes a name for the library,
+the file's own by default.
+
+It asks every time because the way in is **a restart of xochitl**: whatever
+is open closes, the screen reloads for about ten seconds, and if the diary
+was halfway through a word the word stops. Then open the document from the
+library; nothing here can open it for you. It does not need the diary, and
+on `/live` you can watch the tablet come back. How the store is written is in
+[device.md](device.md#putting-a-document-in-the-library).
+
 ## What is written down
 
 `var/audio/*.wav` are recordings of your room, pruned after

@@ -78,6 +78,7 @@ is routed.
 | `GET /api/intent/<id>` | `{id, state, result}` |
 | `POST /api/note` | `{id}` — records a typed note |
 | `POST /api/send` | `{intent, diary}` — asks the diary for a turn |
+| `POST /api/library?name=` | the raw file as the body: a pdf, an epub or an image. Puts it in the tablet's library and restarts xochitl, and answers once it is back: `{id, name, kind, pages, bytes}`. `400` for a file it cannot use, `409` while another is going in, `413` over 64MB (refused on the headers, before the body is read), `502` with the tablet's own complaint |
 | `POST /api/login` | form-encoded `password`; `303` to `/` with the cookie, or the form again with `401` |
 | anything else | the built client, with index as the fallback so routing works: `/live` is the live page, anything else the timeline |
 

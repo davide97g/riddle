@@ -71,6 +71,10 @@ One company, and it is worth knowing what it sees.
   never written to disk. Behind the tunnel that is to anybody with the
   password, so the password is guarding your notebook as well as your pen.
   Without `RIDDLE_ALLOW_SNAP=1` it is refused.
+- **A document put on the tablet goes to the tablet**, and to nowhere on
+  this machine: it is packed in memory and piped into xochitl's store. From
+  there it is the tablet's like any other document -- including to
+  reMarkable's cloud, if sync is on.
 - Nothing else. The server binds loopback; `riddle voice share` exposes it
   only on your own tailnet, behind a certificate.
 

@@ -125,6 +125,33 @@ Injection tuning has **not** been re-validated since the 3.28 update beyond
 the above; re-run the test sheet after a firmware update before trusting any
 of these numbers.
 
+## Putting a document in the library
+
+There is no import api on this firmware. The USB web interface has an upload
+form, but only on the cable's address, and the diary lives on wifi. What
+works is what xochitl does itself: the store in
+`/home/root/.local/share/remarkable/xochitl` is flat, one
+`<uuid>.pdf` (or `.epub`) beside a `<uuid>.metadata` and a `<uuid>.content`,
+and xochitl reads it at startup. `riddle.device.library` writes those three
+from a tar piped over one ssh, with fields mirroring the tablet's own files
+on 3.28; xochitl fills in the rest the first time the document is opened.
+
+**xochitl is stopped around the write**, for the reason `restore.sh` stops
+it: it holds the store in memory and rewrites it on exit, so a file written
+under it can be clobbered by its stale copy on the way down. The remote side
+is stop, untar, sync, start, and it starts xochitl again even when the tar
+fails, so a bad upload costs a restart rather than a tablet with no
+interface. The restart closes whatever is open, the screen reloads for about
+ten seconds, and the document waits in the library to be opened by hand.
+
+A pdf or epub goes in untouched. An image becomes a one-page greyscale pdf:
+turned by its EXIF flag, transparency flattened onto white (dropped straight
+to grey, a transparent png turns black), capped at twice the screen's
+resolution, and on a page whose long side is the screen's own 8.28in at
+226 dpi, so 100% zoom is one pixel per pixel. A wide picture is marked
+`landscape` in its `.content`, so xochitl turns the page rather than shrinking
+it to a strip across a tall screen.
+
 ## Reading the screen
 
 There is no framebuffer to read, so `riddle snap --yes` takes the cruder

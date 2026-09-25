@@ -4,6 +4,7 @@ import { ConnectionBadge } from '@/components/ConnectionBadge'
 import { DiaryButton } from '@/components/DiaryButton'
 import { EraseButton } from '@/components/EraseButton'
 import { LiveButton } from '@/components/LiveButton'
+import { SendToTablet } from '@/components/SendToTablet'
 import { Splash } from '@/components/Splash'
 import { Timeline } from '@/components/Timeline'
 import { Wordmark } from '@/components/Wordmark'
@@ -32,6 +33,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <DiaryButton />
           <LiveButton />
+          <SendToTablet />
           <ConnectionBadge />
           <EraseButton />
         </div>

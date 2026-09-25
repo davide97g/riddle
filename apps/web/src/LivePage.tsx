@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { LiveScreen } from '@/components/LiveScreen'
+import { SendToTablet } from '@/components/SendToTablet'
 import { SnapButton, SnapshotShelf } from '@/components/Snapshots'
 import { Wordmark } from '@/components/Wordmark'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,8 @@ import { useSnapshots } from '@/hooks/useSnapshots'
  *  A page of its own rather than a mode of the timeline, so it can be left
  *  open on a second screen, bookmarked, or handed to somebody who should see
  *  the notebook without being able to send, erase or stop anything -- there
- *  is no control here that reaches the pen. */
+ *  is no control here that reaches the pen. The one thing it can send the
+ *  tablet is a document for its library, which never goes near the pen. */
 export function LivePage() {
   const live = useLiveScreen()
   const { snaps, kept, take, remove } = useSnapshots()
@@ -35,11 +37,16 @@ export function LivePage() {
           </span>
           <span className="sr-only">riddle, live</span>
         </h1>
-        <Button asChild size="icon-sm" variant="ghost">
-          <a href="/" aria-label="Back to the timeline" title="Back to the timeline">
-            <ArrowLeft className="size-4" />
-          </a>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Here as well as on the timeline: this is where you watch it
+              arrive. */}
+          <SendToTablet />
+          <Button asChild size="icon-sm" variant="ghost">
+            <a href="/" aria-label="Back to the timeline" title="Back to the timeline">
+              <ArrowLeft className="size-4" />
+            </a>
+          </Button>
+        </div>
       </header>
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <LiveScreen live={live} action={<SnapButton frame={live.blob} take={take} />} />

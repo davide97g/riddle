@@ -23,6 +23,9 @@ from riddle.web import auth, live, wsock
 
 POLL_S = 0.25  # how often the store is tailed for anything new
 SEND_S = 5.0   # how long one page may take a frame before it is dropped
+# The largest request body read at all. Only a document for the library is
+# ever this big; anything past it is refused before a byte is buffered.
+MAX_BODY = 65 << 20
 
 INDEX_FALLBACK = b"""<!doctype html><meta charset=utf-8>
 <title>riddle</title><body style="font:16px system-ui;padding:3rem;max-width:34rem">
@@ -132,6 +135,10 @@ class Server:
         # two of them racing would be two ssh pipes, or a stop overtaking the
         # start it was meant to follow.
         self.working = False
+        # A document on its way into the tablet's library. One at a time too:
+        # each one restarts xochitl, and two restarts racing is a tablet
+        # that comes back without one of them.
+        self.shelving = False
         # Off unless a password is set, which is the loopback case: reaching
         # the port already means reaching the machine.
         self.gate = auth.Gate(config.get().web_password)
@@ -144,6 +151,11 @@ class Server:
     async def handle(self, reader, writer) -> None:
         try:
             request = await _read_request(reader)
+        except TooLarge:
+            _json(writer, {"error": f"over {MAX_BODY >> 20}MB"},
+                  status="413 Content Too Large")
+            writer.close()
+            return
         except (ConnectionResetError, ValueError):
             writer.close()
             return
@@ -234,6 +246,9 @@ class Server:
             )
             return _json(writer, {"intent": intent, "diary": self.diary()})
 
+        if method == "POST" and path == "/api/library":
+            return await self.library(writer, query, body)
+
         if path.startswith("/api/intent/"):
             found = self.store.intent(int(path.rsplit("/", 1)[1] or 0))
             if found is None:
@@ -244,6 +259,42 @@ class Server:
             return _json(writer, {"error": "no such route"}, status="404 Not Found")
 
         return self.page(writer, path)
+
+    async def library(self, writer, query: dict, body: bytes) -> None:
+        """Put the request body in the tablet's library as a document.
+
+        This process writes to the tablet here, and still constructs no
+        `Device`: the document goes into xochitl's store over an ssh of its
+        own, and the pen is not involved. What it does cost is a restart of
+        xochitl, which is why the page asks before it sends anything.
+
+        Packing and pushing are both in threads -- Pillow on a big photograph
+        and a restart that takes seconds -- and neither touches the store.
+        """
+        import asyncio
+
+        from riddle.device import library
+
+        if self.shelving:
+            return _json(writer, {"error": "already putting something on the tablet"},
+                         status="409 Conflict")
+        self.shelving = True
+        try:
+            name = library.title(query.get("name", ""))
+            doc = await asyncio.to_thread(library.pack, body, name)
+            uid = await asyncio.to_thread(library.push, doc, config.get().ssh_host)
+        except ValueError as exc:
+            return _json(writer, {"error": str(exc)}, status="400 Bad Request")
+        except Exception as exc:  # noqa: BLE001 - the tablet's answer, passed on
+            print(f"library: {exc!r}", flush=True)
+            return _json(writer, {"error": str(exc)}, status="502 Bad Gateway")
+        finally:
+            self.shelving = False
+        print(f"library: {doc.name!r} ({doc.kind}, {len(doc.body) >> 10}K) -> {uid}", flush=True)
+        return _json(writer, {
+            "id": uid, "name": doc.name, "kind": doc.kind,
+            "pages": doc.pages, "bytes": len(doc.body),
+        })
 
     def page(self, writer, path: str) -> None:
         """Serve the built app, falling back to index so routing works."""
@@ -452,6 +503,10 @@ class Server:
             await capture.done()
 
 
+class TooLarge(Exception):
+    """A body over `MAX_BODY`, refused on its headers alone."""
+
+
 async def _read_request(reader):
     line = await reader.readline()
     if not line:
@@ -471,6 +526,8 @@ async def _read_request(reader):
 
     body = b""
     length = int(headers.get("content-length", 0) or 0)
+    if length > MAX_BODY:
+        raise TooLarge
     if length:
         body = await reader.readexactly(length)
     return method, target, headers, body
