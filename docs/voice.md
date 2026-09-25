@@ -154,7 +154,17 @@ does **not** need the diary running — the feed is its own ssh connection,
 so it keeps going while the loop is stopped, or busy drawing an answer.
 
 It opens no events socket, only `/ws/live`, and leaving it is what ends the
-feed. Only frames that changed are sent, so the line above the page says when it
+feed.
+
+**Snapshot** takes the frame on screen: it goes onto the clipboard as a png
+and onto the shelf beside the page (under it on a phone), which keeps the
+last ten in the browser's `localStorage` and survives a reload. Each one
+opens full size and downloads or copies on its own, as the tablet sent it —
+1404x1872, white paper, black ink — whatever the dark theme did to the
+preview. Nothing is read off the tablet again for it, and the server never
+hears about it. A browser whose storage is full keeps as many of the newest
+as fit and says so. Safari and Chrome copy images; a browser that cannot
+still keeps the snapshot and says it did not copy. Only frames that changed are sent, so the line above the page says when it
 last changed rather than when it was last read. A frame is a torn read:
 the stroke being drawn as it is taken can come out half finished, and is
 whole in the next one. The wire is in

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { InkWave, StatusLine } from '@/components/Status'
 import { INK } from '@/components/rows/Rows'
-import { useLiveScreen } from '@/hooks/useLiveScreen'
+import type { LiveScreen as Feed } from '@/hooks/useLiveScreen'
 
 function ago(ms: number) {
   const s = Math.round(ms / 1000)
@@ -20,9 +20,11 @@ function ago(ms: number) {
  *
  *  The frame is the same opaque greyscale a capture is, so it gets the same
  *  treatment: the paper is dropped in the browser and the ink sits on the
- *  page like any other row. */
-export function LiveScreen() {
-  const live = useLiveScreen()
+ *  page like any other row.
+ *
+ *  `action` sits at the end of the status line, which is where the one thing
+ *  you can do with a live page goes. */
+export function LiveScreen({ live, action }: { live: Feed; action?: React.ReactNode }) {
   const [inked, setInked] = useState(false)
 
   // "last change 12s ago" has to count on its own: a page nobody is writing
@@ -46,22 +48,25 @@ export function LiveScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 py-3">
-      <StatusLine
-        className="mx-auto w-full max-w-2xl"
-        motif={
-          live.state === 'on' ? (
-            <span className="size-2 rounded-full bg-live conn-breathe" />
-          ) : live.state === 'refused' ? (
-            <span className="size-2 rounded-full bg-destructive" />
-          ) : (
-            <InkWave bars={3} />
-          )
-        }
-      >
-        <span className="block truncate" title={said}>
-          {said}
-        </span>
-      </StatusLine>
+      <div className="mx-auto flex w-full max-w-2xl items-center gap-2">
+        <StatusLine
+          className="min-w-0 flex-1"
+          motif={
+            live.state === 'on' ? (
+              <span className="size-2 rounded-full bg-live conn-breathe" />
+            ) : live.state === 'refused' ? (
+              <span className="size-2 rounded-full bg-destructive" />
+            ) : (
+              <InkWave bars={3} />
+            )
+          }
+        >
+          <span className="block truncate" title={said}>
+            {said}
+          </span>
+        </StatusLine>
+        {action}
+      </div>
       {/* Sized as a container so the page can be exactly as large as fits:
           the paper is dropped from the image, so the edge is a border on a
           box of the tablet's own proportions, and a box that only

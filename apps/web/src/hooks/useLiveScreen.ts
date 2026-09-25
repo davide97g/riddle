@@ -6,6 +6,8 @@ const MAX_BACKOFF = 5000
 export type LiveScreen = {
   /** an object url for the newest frame, or null before the first */
   src: string | null
+  /** the same frame as a blob, for copying and keeping without a refetch */
+  blob: Blob | null
   /** `refused` is the server saying no, which a redial will not change */
   state: 'off' | 'dialing' | 'on' | 'lost' | 'refused'
   message: string | null
@@ -16,7 +18,7 @@ export type LiveScreen = {
   changedAt: number | null
 }
 
-const OFF: LiveScreen = { src: null, state: 'off', message: null, changedAt: null }
+const OFF: LiveScreen = { src: null, blob: null, state: 'off', message: null, changedAt: null }
 
 /** The tablet's screen, for as long as the caller is mounted.
  *
@@ -50,10 +52,11 @@ export function useLiveScreen(): LiveScreen {
           setView((v) => ({ ...v, state: msg.state, message: msg.message ?? null }))
           return
         }
-        const next = URL.createObjectURL(new Blob([e.data], { type: 'image/png' }))
+        const blob = new Blob([e.data], { type: 'image/png' })
+        const next = URL.createObjectURL(blob)
         const old = shown
         shown = next
-        setView((v) => ({ ...v, src: next, changedAt: performance.now() }))
+        setView((v) => ({ ...v, src: next, blob, changedAt: performance.now() }))
         if (old) window.setTimeout(() => URL.revokeObjectURL(old), 1000)
       }
       sock.onclose = (e) => {

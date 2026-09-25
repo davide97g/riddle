@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { LiveScreen } from '@/components/LiveScreen'
+import { SnapButton, SnapshotShelf } from '@/components/Snapshots'
 import { Wordmark } from '@/components/Wordmark'
 import { Button } from '@/components/ui/button'
+import { useLiveScreen } from '@/hooks/useLiveScreen'
+import { useSnapshots } from '@/hooks/useSnapshots'
 
 /** `/live`: the page on the tablet, and nothing else.
  *
@@ -11,6 +14,9 @@ import { Button } from '@/components/ui/button'
  *  the notebook without being able to send, erase or stop anything -- there
  *  is no control here that reaches the pen. */
 export function LivePage() {
+  const live = useLiveScreen()
+  const { snaps, kept, take, remove } = useSnapshots()
+
   useEffect(() => {
     const was = document.title
     document.title = 'riddle · live'
@@ -35,7 +41,10 @@ export function LivePage() {
           </a>
         </Button>
       </header>
-      <LiveScreen />
+      <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <LiveScreen live={live} action={<SnapButton frame={live.blob} take={take} />} />
+        <SnapshotShelf snaps={snaps} kept={kept} remove={remove} />
+      </main>
     </div>
   )
 }

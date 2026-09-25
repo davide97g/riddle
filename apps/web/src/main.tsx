@@ -15,7 +15,12 @@ const live = window.location.pathname.replace(/\/+$/, '') === '/live'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {live ? (
-      <LivePage />
+      <>
+        <LivePage />
+        {/* At the bottom: at the top it would sit over the snapshot button,
+            and the second snapshot is taken seconds after the first. */}
+        <Toaster position="bottom-center" />
+      </>
     ) : (
       <RiddleProvider>
         <App />
