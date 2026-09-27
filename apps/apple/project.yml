@@ -27,10 +27,17 @@ targets:
         excludes:
           - "Info.plist"
           - "*.entitlements"
+          - "AppIcon.icon"
+          - "AppIcon.icon/**"
+      - path: Riddle/AppIcon.icon
+        type: file
+        buildPhase: resources
     info:
       path: Riddle/Info.plist
       properties:
         CFBundleDisplayName: riddle
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
         NSMicrophoneUsageDescription: What you say to the diary is streamed to your riddle server to be transcribed.
         NSLocalNetworkUsageDescription: The riddle server usually lives on your own network.
@@ -55,6 +62,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davide97g.riddle
         PRODUCT_NAME: Riddle
+        # Riddle/AppIcon.icon, an Icon Composer document drawn by
+        # icon/make_icon.py. The system renders the glass and the dark and
+        # tinted versions from it, on both platforms.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         # Ad hoc on the Mac, so it runs from a clone with no account; the
         # iPhone needs a team, set in Xcode or with DEVELOPMENT_TEAM=.

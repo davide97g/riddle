@@ -23,6 +23,15 @@ xcodebuild -scheme Riddle -destination 'generic/platform=iOS Simulator' \
 a clone with no Apple account. An iPhone needs a team: set it in Xcode under
 Signing, or pass `DEVELOPMENT_TEAM=...` to `xcodebuild`.
 
+For other Macs, `./package.sh` builds `build/Riddle-<version>.dmg`: signed
+with the Developer ID, notarized and stapled. It needs a notarytool profile
+called `riddle`; the script's header says how to store one.
+
+The icon is `Riddle/AppIcon.icon`, an Icon Composer document whose one layer
+`icon/make_icon.py` draws: the wordmark's own strokes, bent round a circle.
+Rerun it after changing the word or the bend, and look at the result with
+`ictool` rather than guessing; the script's header has the command.
+
 Xcode 27 and the 26 SDKs, Swift 6 with the main actor as the default
 isolation. The two things off it are the audio tap (`AudioPipe`) and the wire
 types, which say so.

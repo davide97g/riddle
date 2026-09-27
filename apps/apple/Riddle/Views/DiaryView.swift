@@ -35,8 +35,7 @@ struct DiaryView: View {
                 }
                 #if os(iOS)
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { settings = true } label: { Image(systemName: "gearshape") }
-                        .accessibilityLabel("Server")
+                    PhoneMenu { settings = true }
                 }
                 #endif
             }
@@ -237,3 +236,40 @@ struct EraseButton: View {
             }
     }
 }
+
+#if os(iOS)
+/// The gear on a phone: the switch, the microphone and the server, which on
+/// the Mac sit under the composer and in Settings.
+private struct PhoneMenu: View {
+    let server: () -> Void
+    @Environment(Diary.self) private var diary
+    @Environment(Microphone.self) private var mic
+
+    var body: some View {
+        @Bindable var mic = mic
+        Menu {
+            Toggle(isOn: Binding(get: { diary.vanish }, set: { diary.setVanish($0) })) {
+                Label("Vanish and answer", systemImage: "wand.and.sparkles")
+            }
+            .disabled(diary.conn != .open)
+            if diary.listening {
+                Picker(selection: $mic.chosen) {
+                    Text("System default").tag(String?.none)
+                    ForEach(mic.inputs) { input in Text(input.name).tag(Optional(input.id)) }
+                } label: {
+                    Label("Microphone", systemImage: "mic")
+                    Text(mic.inputs.first { $0.id == mic.chosen }?.name ?? "System default")
+                }
+                .pickerStyle(.menu)
+                .disabled(mic.state != .idle)
+            }
+            Divider()
+            Button(action: server) { Label("Server…", systemImage: "server.rack") }
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .accessibilityLabel("Settings")
+        .onAppear { mic.refresh() }
+    }
+}
+#endif

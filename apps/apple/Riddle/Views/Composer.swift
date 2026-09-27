@@ -6,6 +6,7 @@ struct Composer: View {
     @Environment(Connection.self) private var connection
     @Environment(Microphone.self) private var mic
     @Environment(Toasts.self) private var toasts
+    @Environment(\.horizontalSizeClass) private var width
     @FocusState private var typing: Bool
 
     var body: some View {
@@ -37,20 +38,27 @@ struct Composer: View {
                     .disabled(!canSend)
                     .keyboardShortcut(.return, modifiers: .command)
             }
-            VanishToggle()
+            // On a phone the switch and the microphone live in the gear
+            // menu, and the line under the row only speaks when something
+            // is off: a footer that explains itself while everything works
+            // is a footer in the way.
+            let compact = width == .compact
+            if !compact { VanishToggle() }
             if mic.state == .recording { LevelMeter(level: mic.level) }
-            if diary.listening { MicPicker(disabled: mic.state != .idle) }
-            Text(sentence)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .contentTransition(.opacity)
-                .animation(.easeOut, value: sentence)
+            if !compact, diary.listening { MicPicker(disabled: mic.state != .idle) }
+            if let said = compact ? problem : (problem ?? Self.fine) {
+                Text(said)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .contentTransition(.opacity)
+                    .animation(.easeOut, value: said)
+            }
         }
         .frame(maxWidth: 680)
         .padding(.horizontal, 16)
         .padding(.top, 10)
-        .padding(.bottom, 12)
+        .padding(.bottom, width == .compact ? 8 : 12)
         .frame(maxWidth: .infinity)
         .background(.bar)
         .onChange(of: mic.failure) { _, said in
@@ -60,13 +68,15 @@ struct Composer: View {
         }
     }
 
-    /// Why you cannot send, or what Send will do.
-    private var sentence: String {
+    private static let fine = "Send asks the diary for an answer now. It always answers on the tablet."
+
+    /// Why you cannot send, or cannot speak, if anything is in the way.
+    private var problem: String? {
         if !diary.vanish { return "Vanishing is off: what you write stays on the page, and the diary does not answer." }
         if diary.watched == .live { return "The page is open on Live, so the diary leaves it alone. Close Live to write to it." }
         if !diary.diary.present { return "The diary is not running, so nothing would answer a send." }
         if !diary.listening { return "No speech model loaded, so the microphone is off." }
-        return "Send asks the diary for an answer now. It always answers on the tablet."
+        return nil
     }
 }
 
