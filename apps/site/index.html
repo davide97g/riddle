@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>riddle, a diary that writes back on your reMarkable</title>
+  <meta name="description" content="Write on your reMarkable 2 and pause. Your ink fades, and the diary answers in its own handwriting. Open source, self-hosted, with an app for iPhone and Mac.">
+  <link rel="canonical" href="https://get-riddle.davideghiotto.it/">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f2f2ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://get-riddle.davideghiotto.it/">
+  <meta property="og:title" content="riddle, a diary that writes back">
+  <meta property="og:description" content="Write on your reMarkable and pause. Your ink fades, and the diary answers in its own hand.">
+  <meta property="og:image" content="https://get-riddle.davideghiotto.it/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The word riddle in handwriting, above a handwritten answer: Someone who keeps your pages.">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" href="/assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/strokes.json" as="fetch" type="application/json" crossorigin>
+  <link rel="stylesheet" href="/assets/site.css">
+  <script type="module" src="/assets/site.js"></script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "riddle",
+    "description": "A diary for the reMarkable 2 that answers in its own handwriting. You write, you pause, your ink fades and a reply is written back by driving the pen.",
+    "applicationCategory": "LifestyleApplication",
+    "operatingSystem": "macOS, iOS, Linux",
+    "url": "https://get-riddle.davideghiotto.it/",
+    "downloadUrl": "https://github.com/davide97g/riddle/releases/latest",
+    "license": "https://opensource.org/licenses/MIT",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+    "author": { "@type": "Person", "name": "Davide Ghiotto", "url": "https://github.com/davide97g" },
+    "sameAs": ["https://github.com/davide97g/riddle"]
+  }
+  </script>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
+<!-- lucide (ISC) for the line icons; Simple Icons (CC0) for the two brand marks -->
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-file-up" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></symbol>
+<symbol id="i-router" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6.01 18H6"/><path d="M10.01 18H10"/><path d="M15 10v4"/><path d="M17.84 7.17a4 4 0 0 0-5.66 0"/><path d="M20.66 4.34a8 8 0 0 0-11.31 0"/></symbol>
+<symbol id="i-notebook-pen" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></symbol>
+<symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" data-nav>
+  <a class="brand" href="/" aria-label="riddle, home">
+    <svg class="wordmark" data-wordmark data-speed="0.55" aria-hidden="true"></svg>
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#how">How it works</a>
+    <a href="#app">The app</a>
+    <a href="#questions">Questions</a>
+  </nav>
+  <a class="btn btn-ink btn-sm" href="https://github.com/davide97g/riddle">
+    <svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>
+    <span>Read the source</span>
+  </a>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow">For the reMarkable 2</p>
+      <h1 id="hero-title">A diary that <em>writes back</em>.</h1>
+      <p class="lede">Write on your reMarkable and pause. Your ink fades, and the diary answers in its own hand.</p>
+      <div class="ctas">
+        <a class="btn btn-ink" href="https://github.com/davide97g/riddle">
+          <svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>
+          <span>Read the source</span>
+        </a>
+        <a class="btn btn-line" href="https://github.com/davide97g/riddle/releases/latest/download/Riddle-0.1.0.dmg" data-download>
+          <svg class="icon" aria-hidden="true"><use href="#i-apple"/></svg>
+          <span>Download for Mac</span>
+        </a>
+      </div>
+    </div>
+
+    <figure class="tablet tablet-hero" data-demo>
+      <div class="bezel">
+        <div class="sheet">
+          <svg class="page" viewBox="0 0 1404 1872" role="img" aria-label="A reMarkable page. A question is written by hand, fades away, and an answer is written back in a different hand.">
+            <g class="rules" aria-hidden="true"></g>
+            <g class="ink ink-you"></g>
+            <g class="ink ink-diary"></g>
+            <circle class="nib" r="9" cx="-40" cy="-40"/>
+          </svg>
+          <div class="pause-clock" aria-hidden="true"><span></span></div>
+        </div>
+      </div>
+      <figcaption data-demo-caption>Write on the page, then stop for three seconds.</figcaption>
+    </figure>
+  </section>
+
+  <section class="story" id="how" aria-labelledby="how-title">
+    <h2 id="how-title" class="reveal">Three seconds is the whole interface.</h2>
+    <div class="story-grid">
+      <div class="story-stage">
+        <div class="tablet tablet-story" data-story-stage>
+          <div class="bezel">
+            <div class="sheet">
+              <svg class="page" viewBox="0 0 1404 1872" aria-hidden="true">
+                <g class="rules"></g>
+                <g class="ink ink-you"></g>
+                <g class="ink ink-diary"></g>
+                <circle class="nib" r="9" cx="-40" cy="-40"/>
+              </svg>
+              <div class="pause-clock"><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ol class="story-steps">
+        <li data-step="write">
+          <h3>You write.</h3>
+          <p>In ink, on any page of any notebook. A small agent on the tablet reads the pen. Your notebooks, menus and sync stay as they were.</p>
+        </li>
+        <li data-step="stop">
+          <h3>You stop.</h3>
+          <p>Three seconds without the pen is a question. What you wrote is rubbed off the page with the eraser, the way you would do it yourself.</p>
+        </li>
+        <li data-step="answer">
+          <h3>It answers.</h3>
+          <p>The reply is written by driving the pen, one stroke at a time, in a hand of its own. A word it leans on comes out heavier.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="rest" aria-labelledby="rest-title">
+    <h2 id="rest-title" class="reveal">The rest of it.</h2>
+    <div class="bento">
+      <article class="cell cell-home reveal">
+        <svg class="icon icon-lg" aria-hidden="true"><use href="#i-router"/></svg>
+        <h3>The tablet never leaves your network.</h3>
+        <p>Ink only crosses your own Wi-Fi, to a computer you own. The page is the only thing that can be published, and it carries a password.</p>
+      </article>
+      <article class="cell cell-voice reveal" data-inview>
+        <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg>
+        <h3>Say it instead.</h3>
+        <p>Speak from your phone and it is transcribed on your own machine, by a speech model that never phones home.</p>
+        <div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </article>
+      <article class="cell cell-live reveal" data-inview>
+        <div class="live-row">
+          <svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>
+          <span class="live-dot" aria-hidden="true"></span>
+        </div>
+        <h3>Watch the page.</h3>
+        <p>The tablet's screen, about once a second, read-only. No model involved.</p>
+      </article>
+      <article class="cell cell-pdf reveal">
+        <svg class="icon" aria-hidden="true"><use href="#i-file-up"/></svg>
+        <h3>Hand it a pdf.</h3>
+        <p>A pdf, an epub or a picture goes into the tablet's library as a real document you can write on.</p>
+      </article>
+      <article class="cell cell-memory reveal">
+        <div class="memory-copy">
+          <svg class="icon" aria-hidden="true"><use href="#i-notebook-pen"/></svg>
+          <h3>It remembers a little.</h3>
+          <p>A handful of lines about you, kept between pages in a plain text file you can read and edit.</p>
+        </div>
+        <svg class="drawn" data-line="memory" data-speed="1.5" role="img" aria-label="Handwritten: You told me about the train."></svg>
+      </article>
+    </div>
+  </section>
+
+  <section class="app" id="app" aria-labelledby="app-title">
+    <div class="phones" aria-hidden="true">
+      <img class="phone phone-back" src="/assets/img/app-dark-sm.webp" srcset="/assets/img/app-dark-sm.webp 603w, /assets/img/app-dark.webp 1206w" sizes="(max-width: 767px) 52vw, 300px" width="603" height="1311" alt="" loading="lazy" decoding="async">
+      <img class="phone phone-front" src="/assets/img/app-light-sm.webp" srcset="/assets/img/app-light-sm.webp 603w, /assets/img/app-light.webp 1206w" sizes="(max-width: 767px) 56vw, 320px" width="603" height="1311" alt="" loading="lazy" decoding="async">
+    </div>
+    <div class="app-copy reveal">
+      <picture>
+        <source srcset="/assets/img/icon-dark.webp" media="(prefers-color-scheme: dark)">
+        <img class="app-icon" src="/assets/img/icon-light.webp" width="112" height="112" alt="The riddle app icon: the word riddle in ink, bent along a curve.">
+      </picture>
+      <h2 id="app-title">On your iPhone and your Mac.</h2>
+      <p>Talk to the diary, type to it, watch the page live and send it documents. The whole conversation, in the order it happened, with the pages you wrote in it.</p>
+      <div class="ctas">
+        <a class="btn btn-ink" href="https://github.com/davide97g/riddle/releases/latest/download/Riddle-0.1.0.dmg" data-download>
+          <svg class="icon" aria-hidden="true"><use href="#i-apple"/></svg>
+          <span>Download for Mac</span>
+        </a>
+      </div>
+      <p class="fine">Signed and notarized, for macOS 26. The iPhone app builds from the source with Xcode.</p>
+    </div>
+  </section>
+
+  <section class="needs" aria-labelledby="needs-title">
+    <div class="needs-copy">
+      <h2 id="needs-title" class="reveal">What you need.</h2>
+      <dl class="needs-list">
+        <div class="reveal"><dt>A reMarkable 2</dt><dd>On your Wi-Fi, reachable over ssh as root, which it already allows. Nothing else is installed on it.</dd></div>
+        <div class="reveal"><dt>A computer that stays on</dt><dd>A Mac or a small Linux box on the same network. It holds the pen and the conversation.</dd></div>
+        <div class="reveal"><dt>An OpenAI key</dt><dd>For the replies, and for reading a page when you ask. Your own key, your own bill.</dd></div>
+        <div class="reveal"><dt>An evening</dt><dd>The setup is a handful of commands, and the tablet needs calibrating once.</dd></div>
+      </dl>
+    </div>
+    <div class="terminal reveal">
+      <pre><code data-copy-source><span class="c"># the agent, cross-compiled and put on the tablet</span>
+./riddle device build
+
+<span class="c"># check everything before trusting it</span>
+./riddle doctor
+
+<span class="c"># open a notebook on the tablet, then</span>
+./riddle start</code></pre>
+      <button class="copy" type="button" data-copy aria-label="Copy the commands">
+        <svg class="icon" aria-hidden="true"><use href="#i-copy" data-copy-icon/></svg><span data-copy-label>Copy</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="manifesto" aria-label="Write something. Stop. Wait three seconds.">
+    <svg class="drawn drawn-manifesto" data-line="manifesto" data-speed="1.7" aria-hidden="true"></svg>
+    <p class="manifesto-src">The whole manual, from the README.</p>
+  </section>
+
+  <section class="faq" id="questions" aria-labelledby="faq-title">
+    <h2 id="faq-title" class="reveal">Questions.</h2>
+    <div class="faq-list">
+      <details class="reveal">
+        <summary>Does it need a jailbroken tablet?</summary>
+        <p>No. It uses the root ssh access every reMarkable 2 already offers, and installs one small agent. Nothing like Toltec is involved.</p>
+      </details>
+      <details class="reveal">
+        <summary>Will it write over my notes?</summary>
+        <p>It writes on whatever page is open, which is the point. It only rubs out your question and its own ink. Turn off Vanish and answer and it leaves the page alone entirely.</p>
+      </details>
+      <details class="reveal">
+        <summary>Where does my handwriting go?</summary>
+        <p>A picture of what you wrote goes to OpenAI to be read, on each turn. The database, the recordings and the pictures themselves stay on your machine. The privacy notes in the repository list every file it keeps.</p>
+      </details>
+      <details class="reveal">
+        <summary>Does it work on the Paper Pro or the Move?</summary>
+        <p>It is built and calibrated on a reMarkable 2. The other models are untested, and the pen injection depends on the digitizer, so expect work.</p>
+      </details>
+      <details class="reveal">
+        <summary>What does it cost?</summary>
+        <p>Nothing. It is MIT-licensed. The only running cost is the model, which is billed to your own API key.</p>
+      </details>
+    </div>
+  </section>
+
+  <section class="closing" aria-labelledby="closing-title">
+    <svg class="wordmark wordmark-xl" data-wordmark data-speed="0.35" data-on-view aria-hidden="true"></svg>
+    <h2 id="closing-title" class="reveal">Write something. It is listening.</h2>
+    <div class="ctas ctas-center reveal">
+      <a class="btn btn-ink" href="https://github.com/davide97g/riddle">
+        <svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>
+        <span>Read the source</span>
+      </a>
+      <a class="btn btn-line" href="https://github.com/davide97g/riddle/releases/latest/download/Riddle-0.1.0.dmg" data-download>
+        <svg class="icon" aria-hidden="true"><use href="#i-apple"/></svg>
+        <span>Download for Mac</span>
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>MIT licence. Made by <a href="https://github.com/davide97g">Davide Ghiotto</a>.</p>
+  <p class="foot-note">Not affiliated with reMarkable AS. reMarkable is a trademark of reMarkable AS.</p>
+</footer>
+
+<noscript><style>.reveal{opacity:1!important;transform:none!important}</style></noscript>
+</body>
+</html>

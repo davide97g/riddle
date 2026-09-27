@@ -149,6 +149,7 @@ packages/riddle/       all the Python, as one installed package
 device/riddled.c       the on-tablet agent: evdev in, evdev out
 apps/web/              the page you speak into, as a front end
 apps/apple/            the same, native, for macOS and iOS
+apps/site/             the landing page, get-riddle.davideghiotto.it
 scripts/backup/        snapshot and restore, in shell
 docs/                  how it works, and why
 var/                   everything written at runtime. gitignored, disposable

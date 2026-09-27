@@ -72,6 +72,7 @@ struct Timeline: View {
     /// Only follow if the reader is already at the bottom. Yanking the view
     /// out from under someone reading back is worse than a missed row.
     @State private var stick = true
+    @State private var nearBottom = true
     @State private var tick = 0
 
     /// How long a `tool` row may go on claiming to be happening. Nothing
@@ -131,7 +132,17 @@ struct Timeline: View {
             .onScrollGeometryChange(for: Bool.self) { geo in
                 geo.contentSize.height - geo.contentOffset.y - geo.containerSize.height < 80
             } action: { _, near in
-                stick = near
+                nearBottom = near
+            }
+            // Only a scroll by hand decides whether to follow. Content that
+            // grows under the reader -- a capture arriving after its row --
+            // moves the bottom away without anybody having scrolled, and
+            // must not count as reading back.
+            .onScrollPhaseChange { old, now in
+                if old != .idle, now == .idle { stick = nearBottom }
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
+                if stick { scroller.scrollTo("bottom", anchor: .bottom) }
             }
             .onChange(of: rows.count) {
                 if stick { withAnimation(.snappy) { scroller.scrollTo("bottom", anchor: .bottom) } }
