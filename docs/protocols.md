@@ -195,8 +195,12 @@ A change here is a change in four places at once:
 
 - the agent's line protocol: `device/riddled.c`, `riddle.device.agent`, this file
 - the http and websocket messages: `riddle.web.server`,
-  `apps/web/src/lib/protocol.ts`, `apps/web/src/state/reducer.ts`, this file
+  `apps/web/src/lib/protocol.ts`, `apps/web/src/state/reducer.ts`,
+  `apps/apple/Riddle/Wire/Protocol.swift`, `apps/apple/Riddle/Model/Diary.swift`,
+  this file
 
-`apps/web/src/lib/protocol.ts` is a hand-written mirror of this document.
+`apps/web/src/lib/protocol.ts` and `apps/apple/Riddle/Wire/Protocol.swift`
+are hand-written mirrors of this document. `riddle check` holds both to the
+event kinds and to every message the server sends.
 There are a dozen messages and one backend; a codegen step would be more
 moving parts than the thing it describes.

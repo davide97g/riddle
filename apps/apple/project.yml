@@ -1,0 +1,65 @@
+# The native client, for the Mac and the iPhone. `xcodegen` turns this into
+# Riddle.xcodeproj, which is not committed: this file is the project.
+name: Riddle
+options:
+  bundleIdPrefix: com.davide97g
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    # Everything is on the main actor unless it says otherwise. The two
+    # things that say otherwise are the audio tap and the wire types.
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+targets:
+  Riddle:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: Riddle
+        excludes:
+          - "Info.plist"
+          - "*.entitlements"
+    info:
+      path: Riddle/Info.plist
+      properties:
+        CFBundleDisplayName: riddle
+        LSApplicationCategoryType: public.app-category.productivity
+        NSMicrophoneUsageDescription: What you say to the diary is streamed to your riddle server to be transcribed.
+        NSLocalNetworkUsageDescription: The riddle server usually lives on your own network.
+        # The server is plain http on the LAN or the tailnet, and https only
+        # behind the tunnel. Its address is typed in by hand, so there is no
+        # list of domains to except.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.davide97g.riddle
+        PRODUCT_NAME: Riddle
+        CODE_SIGN_STYLE: Automatic
+        # Ad hoc on the Mac, so it runs from a clone with no account; the
+        # iPhone needs a team, set in Xcode or with DEVELOPMENT_TEAM=.
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Riddle/Riddle.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO

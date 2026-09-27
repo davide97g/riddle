@@ -20,6 +20,12 @@ apps/web/node_modules/
 apps/web/dist/
 apps/web/.vite/
 
+# The native client: the project is generated from project.yml, and so is
+# its Info.plist.
+apps/apple/Riddle.xcodeproj/
+apps/apple/Riddle/Info.plist
+apps/apple/build/
+
 # macOS
 .DS_Store
 

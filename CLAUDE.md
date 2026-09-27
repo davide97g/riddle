@@ -26,6 +26,8 @@ The venv holds `numpy` and `pillow` and an editable install of
 key, so there is no CLI for it.
 
 There is no Python test suite. `bun run lint` (oxlint) covers the client.
+The native client is checked by building it for both platforms; see
+[apps/apple/README.md](apps/apple/README.md).
 `./riddle doctor` is the closest thing to an integration check and should
 pass before and after anything structural.
 
@@ -81,6 +83,7 @@ pass before and after anything structural.
 | `riddle/cli/` | argparse groups. Module scope imports only argparse, pathlib and config; everything heavy goes inside the handler |
 | `device/riddled.c` | the agent. Its header holds the *why*; the grammar is in docs/protocols.md |
 | `apps/web` | the client. `src/lib/protocol.ts` mirrors docs/protocols.md by hand |
+| `apps/apple` | the native client, SwiftUI for macOS and iOS. `project.yml` is the project (`xcodegen`); `Wire/Protocol.swift` is the second hand-written mirror |
 | `var/` | everything written at runtime, gitignored whole, disposable |
 
 ## Keeping the docs true
@@ -91,20 +94,21 @@ the same commit.
 | fact | home | mirrors |
 |---|---|---|
 | env vars | `riddle/config.py` | `docs/configuration.md`, `.env.example` (both generated) |
-| http and websocket messages | `docs/protocols.md` | `riddle/web/server.py`, `apps/web/src/lib/protocol.ts`, `state/reducer.ts` |
+| http and websocket messages | `docs/protocols.md` | `riddle/web/server.py`, `apps/web/src/lib/protocol.ts`, `state/reducer.ts`, `apps/apple/Riddle/Wire/Protocol.swift`, `Model/Diary.swift` |
 | the agent's line protocol | `docs/protocols.md` | `device/riddled.c`, `riddle/device/agent.py` |
 | the schema | `riddle/store/schema.sql` | `docs/store.md` |
-| event kinds | `riddle/store/db.py` (`KINDS`) | `docs/store.md`, `protocol.ts`, `Timeline.tsx` |
+| event kinds | `riddle/store/db.py` (`KINDS`) | `docs/store.md`, `protocol.ts`, `Timeline.tsx`, `Protocol.swift`, `Views/Rows.swift` |
 | calibration numbers | `docs/device.md` | `Device.draw` defaults |
 | what is written to disk | `docs/privacy.md` | `.gitignore` |
+| what the native app keeps | `docs/privacy.md` | `apps/apple/Riddle/Model/*.swift` |
 
 **If a change touches a protocol message, a setting, an event kind, a
 calibration number or a file written to disk, the matching doc is part of the
 diff.** If you cannot name the doc, it does not have one yet: add it.
 
 `./riddle check` enforces the mechanical half of this — settings against the
-generated files, event kinds against the client, websocket messages against
-both ends.
+generated files, event kinds against both clients, websocket messages
+against every end.
 
 A module docstring owns the *why* of its own module, and several are worth
 reading before changing them: `web/wsock.py` on hand-rolling RFC 6455,

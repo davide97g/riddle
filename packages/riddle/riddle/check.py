@@ -3,9 +3,9 @@
 Most of what rots in a document cannot be checked by a program. Three things
 can: the list of settings, the list of event kinds, and the list of
 websocket messages. Each of those exists in one place in the code and is
-mirrored in two or three others, and each mirror has drifted before -- the
-README's copy of the agent protocol was missing a third of its lines by the
-time anyone noticed.
+mirrored in two or three others -- the web client, the native one, the
+docs -- and each mirror has drifted before: the README's copy of the agent
+protocol was missing a third of its lines by the time anyone noticed.
 
 So this greps the code for the source of truth and diffs it against the
 mirrors. An env table that polices itself is the difference between docs
@@ -62,6 +62,19 @@ def kinds() -> list[str]:
     for kind in sorted(on_page - rendered):
         problems.append(f"Timeline.tsx renders no row for {kind!r}")
 
+    # The native client mirrors the same list, and renders it in one switch.
+    swift = _text("apps", "apple", "Riddle", "Wire", "Protocol.swift")
+    match = re.search(r"enum EventKind\b[^{]*\{(.*?)\}", swift, re.S)
+    native = set(re.findall(r"case (\w+)", match.group(1))) if match else set()
+    for kind in sorted(set(KINDS) - native):
+        problems.append(f"Protocol.swift has no EventKind {kind!r}")
+    for kind in sorted(native - set(KINDS)):
+        problems.append(f"Protocol.swift declares EventKind {kind!r}, which the store rejects")
+    rows = _text("apps", "apple", "Riddle", "Views", "Rows.swift")
+    drawn = set(re.findall(r"case \.(\w+):", rows))
+    for kind in sorted(native - drawn):
+        problems.append(f"Rows.swift renders no row for {kind!r}")
+
     doc = _text("docs", "store.md")
     for kind in sorted(k for k in KINDS if f"`{k}`" not in doc):
         problems.append(f"docs/store.md does not describe the {kind!r} kind")
@@ -80,6 +93,12 @@ def messages() -> list[str]:
     known = set(re.findall(r"type:\s*'([\w.]+)'", protocol))
     for message in sorted(sent - known):
         problems.append(f"the server sends {message!r}, which protocol.ts does not declare")
+
+    swift = _text("apps", "apple", "Riddle", "Wire", "Protocol.swift")
+    swift += _text("apps", "apple", "Riddle", "Model", "LiveFeed.swift")
+    decoded = set(re.findall(r'case "([\w.]+)":', swift))
+    for message in sorted(sent - decoded):
+        problems.append(f"the server sends {message!r}, which Protocol.swift does not decode")
 
     doc = _text("docs", "protocols.md")
     for message in sorted(m for m in sent if m not in doc):

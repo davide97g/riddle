@@ -39,6 +39,23 @@ The microphone, the snapshots and the look never reach the server; the
 switch does, because the diary is what obeys it. Clearing the site's data
 forgets all four here.
 
+The native app (`apps/apple`) keeps the same four on the device it runs on,
+in its own sandbox rather than a browser:
+
+- in its defaults, `riddle.server` (the address typed into setup),
+  `riddle.mic`, `riddle.vanish` and `riddle.look`;
+- in the keychain, the gate's cookie, `hmac(password, "riddle-v1")`. The
+  password itself is never kept: the token is minted from it once, the same
+  way the server mints it, and checked against the server before anything
+  is saved;
+- in Application Support, `Snapshots/`: up to ten **photographs of your
+  whole page** as png files, and `index.json` with the model's reading of
+  each one that was understood. Deleted from the shelf, the file goes too.
+
+Captures shown in the timeline are fetched with the cookie and held in
+memory only. "Forget this server" removes the address and the token;
+deleting the app removes everything.
+
 Two caveats about the pruning. `RIDDLE_AUDIO_KEEP_DAYS` is applied **at
 startup only**, so a voice server left running for a month never prunes.
 And captures are not pruned at all.
