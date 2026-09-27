@@ -10,15 +10,6 @@ export type EventKind =
   | 'note'
   | 'tool'
   | 'error'
-  | 'ink' // one stroke as it ends, while /share shares a screen; never a row
-
-/** `meta` of an `ink` event: the stroke in panel pixels, 1404x1872 portrait,
- *  whatever way the page on the tablet is turned. A rubber stroke is a pass of
- *  the eraser, which takes whatever it crosses with it. */
-export type InkMeta = {
-  tool: 'pen' | 'rubber'
-  points: [number, number][]
-}
 
 export type DiaryEvent = {
   id: number
@@ -47,9 +38,8 @@ export type DiaryPresence = {
   busy: boolean
 }
 
-/** who is looking at the page on the tablet: somebody on /live, a screen
- *  shared from /share, or nobody */
-export type Watcher = 'live' | 'share' | null
+/** who is looking at the page on the tablet: somebody on /live, or nobody */
+export type Watcher = 'live' | null
 
 export type ServerMessage =
   | ({ type: 'event' } & DiaryEvent)
@@ -78,7 +68,7 @@ export type ServerMessage =
   | { type: 'pong'; t: number }
   /** the switch was turned, from this page or another */
   | { type: 'vanish'; on: boolean }
-  /** somebody opened the page on /live or /share, or the last one left.
+  /** somebody opened the page on /live, or the last one left.
    *  While `by` is set the diary lets every pause go and refuses a send */
   | { type: 'watched'; by: Watcher }
   /** the gate opened or closed: somebody is speaking, or has stopped */
@@ -104,10 +94,6 @@ export type ClientMessage =
   | { type: 'vanish'; on: boolean }
   | { type: 'diary.start' }
   | { type: 'diary.stop' }
-  /** a beat from /share while a screen is shared, every few seconds, and
-   *  `on: false` when it stops. While it beats the diary sends every stroke
-   *  back as an `ink` event and keeps its hands off the page */
-  | { type: 'share'; on: boolean }
 
 /** The text half of /ws/live; the binary half is one png per changed frame.
  *  `dialing` until the tablet answers, `on` while frames arrive, `lost` when

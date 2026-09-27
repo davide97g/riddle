@@ -46,7 +46,7 @@ class Hub:
         # the callable that says what is true. Set by the server; `None` until
         # then, so the first tick always says it once.
         self.diary_was: bool | None = None
-        # Who has the page open on /live or /share, as last told. Starts
+        # Who has the page open on /live, as last told. Starts
         # unknown rather than None so the first poll says it either way.
         self.watcher_was: str | None | bool = False
         self.diary_now = None
@@ -466,12 +466,6 @@ class Server:
             on = bool(msg.get("on"))
             self.store.set_vanish(on)
             return await self.hub.say({"type": "vanish", "on": on})
-        if kind == "share":
-            # A beat, every few seconds while /share has a screen up. The loop
-            # reads it to send each stroke back as it is written, and to keep
-            # its hands off a page that is somebody else's slide.
-            self.store.sharing(bool(msg.get("on")))
-            return
         if kind in ("diary.start", "diary.stop"):
             return await self.half(sock, kind == "diary.start")
         if kind == "send":

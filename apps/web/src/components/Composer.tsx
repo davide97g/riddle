@@ -74,8 +74,6 @@ export function Composer() {
             ? 'Vanishing is off: what you write stays on the page, and the diary does not answer.'
             : state.watched === 'live'
             ? 'The page is open on Live, so the diary leaves it alone. Close Live to write to it.'
-            : state.watched === 'share'
-            ? 'A screen is being shared with the tablet, so the diary leaves the page alone.'
             : !state.diary.present
             ? 'The diary is not running, so nothing would answer a send.'
             : !state.listening

@@ -29,13 +29,13 @@ from riddle.paths import SCHEMA
 # Anything that can be on the timeline. Checked in Python rather than as a
 # column constraint, because adding one to an existing table means rebuilding
 # it, and the value here is catching a typo at the call site.
-KINDS = ("strokes", "speech", "shot", "reply", "note", "tool", "error", "ink")
+KINDS = ("strokes", "speech", "shot", "reply", "note", "tool", "error")
 
 # A session nobody has beaten in this long is over, whatever ended_ms says:
 # a process that was killed outright never got to write it.
 STALE_MS = 60_000
 
-# A page's beat -- `live.watching`, `share.watching` -- older than this has
+# A page's beat -- `live.watching` -- older than this has
 # gone. Three beats of five seconds: one missed is a hiccup, not a departure.
 WATCH_FRESH_MS = 15_000
 
@@ -50,6 +50,9 @@ MIGRATIONS = (
      "ALTER TABLE sessions ADD COLUMN voice_ms INTEGER"),
     # 2: made_ms is session-relative, so an intent has to say which session.
     ("ALTER TABLE intents ADD COLUMN session_id INTEGER REFERENCES sessions(id)",),
+    # 3: /share is gone, and with it the `ink` rows and the beat it kept.
+    ("DELETE FROM events WHERE kind = 'ink'",
+     "DELETE FROM state WHERE key = 'share.watching'"),
 )
 
 # The panel is 1404x1872 and Device._resample already spaces points three
@@ -528,29 +531,15 @@ class Store:
         seen = self.get_state("live.watching")
         return isinstance(seen, int) and 0 <= time.time() * 1000 - seen < within_ms
 
-    def sharing(self, on: bool) -> None:
-        """Say a page is sharing a screen with the tablet, or has stopped.
-
-        A beat like `watching`, for the same reason: a page closed without a
-        word must not leave the loop sending every stroke for ever.
-        """
-        self.set_state("share.watching", int(time.time() * 1000) if on else None)
-
-    def shared(self, within_ms: int) -> bool:
-        seen = self.get_state("share.watching")
-        return isinstance(seen, int) and 0 <= time.time() * 1000 - seen < within_ms
-
     def watcher(self, within_ms: int = WATCH_FRESH_MS) -> str | None:
-        """Who is looking at the page, if anybody: `live`, `share` or None.
+        """Who is looking at the page, if anybody: `live` or None.
 
-        Either one keeps the diary's hands off the page, and the main page
-        says which, because a diary that silently lets every pause go looks
-        exactly like a broken one.
+        It keeps the diary's hands off the page, and the main page says so,
+        because a diary that silently lets every pause go looks exactly like
+        a broken one.
         """
         if self.watched(within_ms):
             return "live"
-        if self.shared(within_ms):
-            return "share"
         return None
 
     def intent(self, intent_id: int) -> dict | None:

@@ -1,8 +1,8 @@
 // The tablet's library, from the page. The server packs and pushes; this is
-// only the request, kept in one place because two pages make it.
+// only the request.
 
-/** Put a file in the tablet's library. What `SendToTablet` and `/share` both
- *  go through: one request, which restarts xochitl on the way. */
+/** Put a file in the tablet's library: one request, which restarts xochitl
+ *  on the way. */
 export async function putInLibrary(body: Blob, name: string): Promise<{ id: string; name: string }> {
   const res = await fetch(`/api/library?name=${encodeURIComponent(name)}`, {
     method: 'POST',
