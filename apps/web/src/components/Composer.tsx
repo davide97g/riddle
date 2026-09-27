@@ -1,23 +1,35 @@
-import { useRef } from 'react'
 import { LevelMeter } from '@/components/LevelMeter'
 import { MicButton } from '@/components/MicButton'
 import { MicPicker } from '@/components/MicPicker'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { VanishSwitch } from '@/components/VanishSwitch'
-import { useAudioCapture } from '@/hooks/useAudioCapture'
-import { useAudioDevices } from '@/hooks/useAudioDevices'
+import type { Microphone } from '@/hooks/useMicrophone'
 import { useDiary } from '@/state/RiddleProvider'
 
-export function Composer() {
+/** What the diary is told, and how.
+ *
+ *  On a phone this is one row -- the microphone, the line, Send -- and the
+ *  switch and the microphone picker live in the menu in the header. The
+ *  sentence under the row only speaks there when something is in the way: a
+ *  footer that explains itself while everything works is a footer in the
+ *  way of the timeline. */
+export function Composer({ microphone }: { microphone: Microphone }) {
   const { state, setDraft, send } = useDiary()
-  const level = useRef(0)
-  const inputs = useAudioDevices()
-  const mic = useAudioCapture(level, inputs)
+  const { level, inputs, mic } = microphone
   const offline = state.conn !== 'open'
+  const problem = !state.vanish
+    ? 'Vanishing is off: what you write stays on the page, and the diary does not answer.'
+    : state.watched === 'live'
+      ? 'The page is open on Live, so the diary leaves it alone. Close Live to write to it.'
+      : !state.diary.present
+        ? 'The diary is not running, so nothing would answer a send.'
+        : !state.listening
+          ? 'No speech model loaded, so the microphone is off.'
+          : null
 
   return (
-    <div className="border-t bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+    <div className="border-t bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur max-sm:pt-2.5 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto flex max-w-2xl items-end gap-2">
         <MicButton
           state={mic.state}
@@ -49,10 +61,17 @@ export function Composer() {
           Send
         </Button>
       </div>
-      <div className="mx-auto mt-2 flex max-w-2xl flex-col items-center gap-1">
-        <VanishSwitch />
-        <LevelMeter level={level} live={mic.state === 'recording'} />
+      <div className="mx-auto mt-2 flex max-w-2xl flex-col items-center gap-1 empty:hidden max-sm:mt-1.5">
+        <div className="max-sm:hidden">
+          <VanishSwitch />
+        </div>
+        {/* Always on the Mac-sized page, where it idles as a flat line; on a
+            phone only while it has something to show. */}
+        <div className={mic.state === 'recording' ? '' : 'max-sm:hidden'}>
+          <LevelMeter level={level} live={mic.state === 'recording'} />
+        </div>
         {state.listening && (
+          <div className="max-sm:hidden">
           <MicPicker
             devices={inputs.devices}
             deviceId={inputs.deviceId}
@@ -63,22 +82,15 @@ export function Composer() {
             // one sentence; the switch waits until the recording is over.
             disabled={mic.state !== 'idle'}
           />
+          </div>
         )}
         {/* Keyed on the sentence: the reason you cannot send changes while
             you are reading it, and a swap without a fade reads as a glitch. */}
         <p
           key={`${state.diary.present}-${state.listening}-${state.vanish}-${state.watched}`}
-          className="row-in text-center text-xs text-muted-foreground"
+          className={`row-in text-center text-xs text-muted-foreground ${problem ? '' : 'max-sm:hidden'}`}
         >
-          {!state.vanish
-            ? 'Vanishing is off: what you write stays on the page, and the diary does not answer.'
-            : state.watched === 'live'
-            ? 'The page is open on Live, so the diary leaves it alone. Close Live to write to it.'
-            : !state.diary.present
-            ? 'The diary is not running, so nothing would answer a send.'
-            : !state.listening
-              ? 'No speech model loaded, so the microphone is off.'
-              : 'Send asks the diary for an answer now. It always answers on the tablet.'}
+          {problem ?? 'Send asks the diary for an answer now. It always answers on the tablet.'}
         </p>
       </div>
     </div>

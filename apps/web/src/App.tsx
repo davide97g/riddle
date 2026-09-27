@@ -4,11 +4,13 @@ import { ConnectionBadge } from '@/components/ConnectionBadge'
 import { DiaryButton } from '@/components/DiaryButton'
 import { EraseButton } from '@/components/EraseButton'
 import { PageMenu } from '@/components/PageMenu'
+import { PhoneMenu } from '@/components/PhoneMenu'
 import { SendToTablet } from '@/components/SendToTablet'
 import { Splash } from '@/components/Splash'
 import { Timeline } from '@/components/Timeline'
 import { Wordmark } from '@/components/Wordmark'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useMicrophone } from '@/hooks/useMicrophone'
 import { useDiary } from '@/state/RiddleProvider'
 
 export default function App() {
@@ -17,6 +19,7 @@ export default function App() {
   // out and measurable the whole time -- hidden, not absent.
   const [booted, setBooted] = useState(false)
   const done = useCallback(() => setBooted(true), [])
+  const microphone = useMicrophone()
   // Live is dead unless the server says it may read the screen: that is
   // RIDDLE_ALLOW_SNAP. It does not need the diary -- the feed is its own
   // connection -- so it stays open when the book in the header is shut.
@@ -47,6 +50,7 @@ export default function App() {
           <SendToTablet />
           <ConnectionBadge />
           <EraseButton />
+          <PhoneMenu microphone={microphone} />
         </div>
       </header>
       {state.conn === 'closed' && (
@@ -58,7 +62,7 @@ export default function App() {
         </Alert>
       )}
       <Timeline />
-      <Composer />
+      <Composer microphone={microphone} />
       <Splash onDone={done} />
     </div>
   )

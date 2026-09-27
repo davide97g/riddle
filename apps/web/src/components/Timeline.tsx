@@ -30,6 +30,7 @@ export function Timeline() {
   const { state } = useDiary()
   const rows = rowsInOrder(state)
   const box = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
 
   // Only the newest reply writes itself on. Two hundred rows of resumed
@@ -61,6 +62,21 @@ export function Timeline() {
     if (el && stick.current) el.scrollTop = el.scrollHeight
   }, [rows.length])
 
+  // A row's capture loads after the row does and makes it taller, which
+  // moves the bottom away without anybody having scrolled. Nothing fires a
+  // scroll event for that, so the page would open short of the newest reply;
+  // growing content is followed for as long as the reader is at the bottom.
+  useEffect(() => {
+    const el = box.current
+    const inner = content.current
+    if (!el || !inner) return
+    const follow = new ResizeObserver(() => {
+      if (stick.current) el.scrollTop = el.scrollHeight
+    })
+    follow.observe(inner)
+    return () => follow.disconnect()
+  }, [])
+
   return (
     <div
       ref={box}
@@ -71,9 +87,11 @@ export function Timeline() {
         stick.current =
           el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM
       }}
-      className="flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+      // No scroll anchoring: it moves scrollTop when a capture grows above the
+      // anchor, which fires a scroll the reader never made and unsticks them.
+      className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 [overflow-anchor:none]"
     >
-      <div className="mx-auto flex max-w-2xl flex-col gap-3">
+      <div ref={content} className="mx-auto flex max-w-2xl flex-col gap-3">
         {rows.length === 0 && (
           <div className="row-in flex flex-col items-center gap-3 py-16">
             <span className="splash-rule h-px w-24 bg-foreground/15" />
