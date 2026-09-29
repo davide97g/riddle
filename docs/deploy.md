@@ -21,7 +21,7 @@ phone ──https──> Cloudflare ──tunnel──> debian:8765 ──sqlite
 | | |
 |---|---|
 | Host | `debian` / `192.168.15.126`, `ssh homelab` |
-| Checkout | `~/riddle`, a plain `git clone` of `main` |
+| Checkout | `~/projects/riddle`, a plain `git clone` of `main` |
 | Python | `uv` made `.venv` — Debian's `python3 -m venv` needs a package that needs root, and `uv` needs neither |
 | Client | built on the box: `~/.bun/bin/bun run build` in `apps/web` |
 | Services | two **user** units, `riddle-voice` and `riddle-diary`, with `Linger=yes` so they survive logout and reboot |
@@ -54,8 +54,8 @@ ssh holding the digitizer, so the next start cannot have it. Same reasoning as
 ### Updating it
 
 ```sh
-ssh homelab 'cd ~/riddle && git pull --ff-only'
-ssh homelab 'cd ~/riddle/apps/web && ~/.bun/bin/bun run build'   # only if the client changed
+ssh homelab 'cd ~/projects/riddle && git pull --ff-only'
+ssh homelab 'cd ~/projects/riddle/apps/web && ~/.bun/bin/bun run build'   # only if the client changed
 ssh homelab 'systemctl --user restart riddle-voice riddle-diary'
 ```
 
@@ -105,7 +105,7 @@ load, which happens every run. The reMarkable's pen is slower than that.
 
 ## The gate
 
-`RIDDLE_WEB_PASSWORD` in the box's `~/riddle/.env`. It is not decoration: the
+`RIDDLE_WEB_PASSWORD` in the box's `~/projects/riddle/.env`. It is not decoration: the
 page shows everything that was written and can ask the pen to write more, so
 publishing the port without it publishes the notebook. Mechanics are in
 [protocols.md](protocols.md#the-gate).
