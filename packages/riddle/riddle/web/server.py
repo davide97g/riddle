@@ -153,7 +153,7 @@ class Server:
         self.shelving = False
         # Off unless a password is set, which is the loopback case: reaching
         # the port already means reaching the machine.
-        self.gate = auth.Gate(config.get().web_password)
+        self.gate = auth.Gate(config.get().web_password, config.get().web_guests)
         # The page as it is on the tablet, for whoever opens /ws/live. It
         # dials nothing until somebody does.
         self.live = live.Live(
@@ -184,17 +184,28 @@ class Server:
             print(f"{method} {path} ws={wsock.wanted(headers)}", flush=True)
         handed_over = False
         try:
+            # Ahead of the gate, and for everybody: a guest who knows the
+            # password has to be able to use it, and a guest is let through.
+            if method == "POST" and path in ("/api/login", "/api/guest"):
+                return self.login(writer, headers, body, guest=path == "/api/guest")
+            if path == "/login" and self.gate.closed:
+                return _send(writer, auth.page(guests=self.gate.guests),
+                             "text/html; charset=utf-8")
             # `/api/health` stays open: it is what a probe asks, it says
             # nothing the login page does not, and a monitor that has to hold
             # a password is a monitor that stops working when it changes.
-            if path != "/api/health" and not self.gate.allows(headers):
+            who = self.gate.who(headers)
+            if path != "/api/health" and who is None:
                 self.refuse(writer, method, path, headers, body)
                 return
+            guest = who == auth.GUEST
+            if guest and not _readable(method, path):
+                return _json(writer, {"error": "read only"}, status="403 Forbidden")
             if path.startswith("/ws/") and wsock.wanted(headers):
                 handed_over = True
-                await self.socket(reader, writer, headers, path, query)
+                await self.socket(reader, writer, headers, path, query, guest)
                 return
-            await self.route(writer, method, path, query, body)
+            await self.route(writer, method, path, query, body, guest)
         except (ConnectionResetError, BrokenPipeError):
             pass
         finally:
@@ -208,36 +219,37 @@ class Server:
         page that gets a live socket believes it is in. A browser asking for
         a page gets the form; anything scripted gets json it can read.
         """
-        if method == "POST" and path == "/api/login":
-            return self.login(writer, headers, body)
         if path.startswith("/api/") or path.startswith("/ws/"):
             return _json(writer, {"error": "locked"}, status="401 Unauthorized")
-        return _send(writer, auth.page(), "text/html; charset=utf-8",
-                     status="401 Unauthorized")
+        return _send(writer, auth.page(guests=self.gate.guests),
+                     "text/html; charset=utf-8", status="401 Unauthorized")
 
-    def login(self, writer, headers, body) -> None:
+    def login(self, writer, headers, body, guest: bool = False) -> None:
         """One field, one cookie, and a redirect rather than a page.
 
         The redirect matters: it turns the POST into a GET, so a reload does
         not re-submit the password and the browser offers to remember it.
+        A guest is the same answer with the other cookie, and needs no field.
         """
+        if guest and not self.gate.guests:
+            return _json(writer, {"error": "no guests here"}, status="404 Not Found")
         form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
-        if not self.gate.admits(form.get("password", "")):
-            return _send(writer, auth.page(wrong=True), "text/html; charset=utf-8",
-                         status="401 Unauthorized")
+        if not guest and not self.gate.admits(form.get("password", "")):
+            return _send(writer, auth.page(wrong=True, guests=self.gate.guests),
+                         "text/html; charset=utf-8", status="401 Unauthorized")
         # Behind cloudflared the connection to this process is plain http and
         # the browser's is not, so the proxy's word is the only evidence that
         # a Secure cookie will ever come back.
         secure = headers.get("x-forwarded-proto", "").lower() == "https"
         return _send(writer, b"", "text/plain", status="303 See Other",
-                     extra={"Location": "/", "Set-Cookie": self.gate.crumb(secure)})
+                     extra={"Location": "/", "Set-Cookie": self.gate.crumb(secure, guest)})
 
-    async def route(self, writer, method, path, query, body) -> None:
+    async def route(self, writer, method, path, query, body, guest=False) -> None:
         if path == "/api/health":
             return _json(writer, {"ok": True, "session": self.store.session_id})
 
         if path == "/api/state":
-            return _json(writer, self.state())
+            return _json(writer, self.state(guest))
 
         if path == "/api/events":
             since = int(query.get("since", 0))
@@ -372,38 +384,51 @@ class Server:
 
     # --- sockets ---------------------------------------------------------
 
-    async def socket(self, reader, writer, headers: dict, path: str, query: dict) -> None:
+    async def socket(self, reader, writer, headers: dict, path: str, query: dict,
+                     guest: bool = False) -> None:
         sock = await wsock.Socket.upgrade(reader, writer, headers)
         if path == "/ws/events":
-            await self.control(sock)
+            await self.control(sock, guest)
         elif path == "/ws/audio":
             await self.audio(sock, query)
         elif path == "/ws/live":
-            await self.watch(sock)
+            await self.watch(sock, guest)
         else:
             await sock.close(1003, "no such socket")
 
-    async def control(self, sock: wsock.Socket) -> None:
+    async def control(self, sock: wsock.Socket, guest: bool = False) -> None:
         self.hub.control.add(sock)
         try:
-            await sock.send(json.dumps({"type": "hello.ok", **self.state()}))
+            await sock.send(json.dumps({"type": "hello.ok", **self.state(guest)}))
             async for raw in sock:
                 if isinstance(raw, bytes):
                     continue  # the control socket is text; audio has its own
-                await self.said(sock, json.loads(raw))
+                msg = json.loads(raw)
+                if guest and msg.get("type") not in ("hello", "ping"):
+                    await sock.send(json.dumps({"type": "error", "message": "read only"}))
+                    continue
+                await self.said(sock, msg)
         except json.JSONDecodeError:
             await sock.close(1003, "not json")
         finally:
             self.hub.control.discard(sock)
 
-    async def watch(self, sock: wsock.Socket) -> None:
+    async def watch(self, sock: wsock.Socket, guest: bool = False) -> None:
         """The tablet's screen, about once a second, until the page closes.
 
         Behind the same switch as `riddle snap`: this reads another process's
         memory on the tablet, and a page being able to ask for it is not the
         same thing as somebody having said it may. Checked per socket rather
         than once, so the switch is what it says in `.env` now.
+
+        Never for a guest. Somebody watching is somebody the diary keeps its
+        hands off the page for, so a stranger on Live would be a stranger
+        stopping it answering. Upgraded and closed with 1008 rather than
+        refused, so the page shows why instead of redialling.
         """
+        if guest:
+            await sock.close(1008, "guests cannot watch the page")
+            return
         if not config.get().allow_snap:
             await sock.close(1008, "RIDDLE_ALLOW_SNAP is not set")
             return
@@ -426,8 +451,9 @@ class Server:
             "busy": self.working,
         }
 
-    def state(self) -> dict:
+    def state(self, guest: bool = False) -> dict:
         return {
+            "guest": guest,
             "session": self.store.session_id,
             "now_ms": self.store.now_ms(),
             "started_ms": self.store.started_ms,
@@ -554,6 +580,19 @@ class Server:
                     )
         finally:
             await capture.done()
+
+
+def _readable(method: str, path: str) -> bool:
+    """What a guest may ask for: anything that only reads.
+
+    Every write over http is a POST, and of the sockets only `/ws/events`
+    is a feed -- the audio socket is a recording, `/ws/live` is turned away
+    in `watch`, and whatever a guest says on the feed is turned away in
+    `control`.
+    """
+    if path == "/ws/audio":
+        return False
+    return method in ("GET", "HEAD")
 
 
 class TooLarge(Exception):

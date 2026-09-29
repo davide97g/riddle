@@ -124,6 +124,10 @@ SETTINGS: tuple[Setting, ...] = (
             "One password in front of the page. Empty means no gate, which is "
             "right on loopback and wrong the moment the port is published.",
             secret=True),
+    Setting("RIDDLE_WEB_GUESTS", "web_guests", bool, False, "voice",
+            "With a password set, offer a way past it that reads everything "
+            "and changes nothing: no send, no note, no microphone, no Live. "
+            "Off, the password is the only way in."),
     Setting("RIDDLE_ASR_MODEL", "asr_model", Path,
             "ggml-parakeet-tdt-0.6b-v3-q8_0.bin", "voice",
             "The speech model, fetched once by hand. Relative paths hang off "
@@ -201,6 +205,7 @@ class Config:
     web_dir: Path
     web_debug: bool
     web_password: str
+    web_guests: bool
     asr_model: Path
     asr_threads: int
     vad_floor: float

@@ -115,6 +115,12 @@ There is deliberately **no Cloudflare Access** in front of this one, unlike
 the cost is a second login on every device; this page is one password and a
 year-long cookie.
 
+`RIDDLE_WEB_GUESTS=1` beside it opens a read-only door: the form gets a
+second button, and whoever presses it sees the whole diary, live, and can
+change nothing. The landing page links here for that reason. What a guest is
+held to is in [protocols.md](protocols.md#the-gate); what they see, in
+[privacy.md](privacy.md).
+
 ## The tunnel
 
 One ingress rule and one DNS record, both in Cloudflare rather than on disk —

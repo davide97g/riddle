@@ -93,6 +93,13 @@ One company, and it is worth knowing what it sees.
   never written to disk. Behind the tunnel that is to anybody with the
   password, so the password is guarding your notebook as well as your pen.
   Without `RIDDLE_ALLOW_SNAP=1` it is refused.
+- **A guest reads everything the timeline holds**, when
+  `RIDDLE_WEB_GUESTS=1`: every stroke, transcript, reply, note and page
+  photograph in `var/captures`, from the start of the session and live as it
+  is written, to anybody who presses the button -- there is no secret in a
+  guest cookie. What a guest cannot do is anything else: send, note, erase,
+  record, start or stop the diary, open Live, or put a file on the tablet.
+  `var/audio` has no route for anybody.
 - **A snapshot you press Understand on goes to OpenAI**, the whole page,
   to `RIDDLE_UNDERSTAND_MODEL`, and only then. Not kept on this machine; the
   reading comes back to the browser that asked.

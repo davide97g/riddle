@@ -96,6 +96,9 @@ nonisolated enum ServerMessage: Sendable {
     case unknown(String)
 
     nonisolated struct Hello: Decodable, Sendable {
+        /// in through the guest door, read only. The app always signs in
+        /// with the password, so this is only ever false here
+        let guest: Bool?
         let session: Int
         let started_ms: Int
         let now_ms: Int

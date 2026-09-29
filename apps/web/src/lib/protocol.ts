@@ -45,6 +45,9 @@ export type ServerMessage =
   | ({ type: 'event' } & DiaryEvent)
   | {
       type: 'hello.ok'
+      /** this page came in through the guest door: it may read the feed and
+       *  nothing else, and the server refuses whatever else it says */
+      guest?: boolean
       session: number
       started_ms: number
       now_ms: number

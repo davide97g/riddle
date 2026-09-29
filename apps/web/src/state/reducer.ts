@@ -17,6 +17,8 @@ export type State = {
   serverNowMs: number | null
   greetedAt: number | null
   listening: boolean
+  /** read only: in without the password, so there is nothing to press */
+  guest: boolean
   /** whether the server will stream the tablet's screen */
   live: boolean
   /** whether the diary fades the ink and answers after a pause */
@@ -44,6 +46,7 @@ export const initial: State = {
   serverNowMs: null,
   greetedAt: null,
   listening: false,
+  guest: false,
   live: false,
   vanish: true,
   vanishKnown: false,
@@ -150,6 +153,7 @@ export function reduce(state: State, action: Action): State {
           serverNowMs: msg.now_ms,
           greetedAt: performance.now(),
           listening: msg.listening,
+          guest: msg.guest ?? false,
           live: msg.live ?? false,
           vanish: msg.vanish ?? state.vanish,
           vanishKnown: typeof msg.vanish === 'boolean',

@@ -16,6 +16,14 @@ The token is `hmac(password, "riddle-v1")`: deterministic, so a restart does
 not log anybody out and no secret has to be kept on disk beside the database,
 and one-way, so the cookie cannot be turned back into the password. Changing
 the password is what revokes it.
+
+A guest is the other way past the form, and only when `RIDDLE_WEB_GUESTS`
+says there is one. Its cookie is the word `guest` and nothing secret, because
+it proves nothing: anyone may press the button, so anyone may forge the
+cookie. What it buys is exactly what the button offers -- the diary read, as
+it was and as it is being written -- and the server, not the page, is what
+keeps a guest from doing anything else. Turning the switch off is what
+revokes it.
 """
 
 import hashlib
@@ -24,30 +32,40 @@ import hmac
 COOKIE = "riddle"
 YEAR_S = 31_536_000
 
+OWNER = "owner"
+GUEST = "guest"
+
 
 class Gate:
-    def __init__(self, password: str) -> None:
+    def __init__(self, password: str, guests: bool = False) -> None:
         self.password = password or ""
         self._token = _mint(self.password) if self.password else ""
+        # Without a password there is nothing to be a guest of.
+        self.guests = self.closed and guests
 
     @property
     def closed(self) -> bool:
         """Whether anything is being asked for at all."""
         return bool(self.password)
 
-    def allows(self, headers: dict) -> bool:
+    def who(self, headers: dict) -> str | None:
+        """`OWNER`, `GUEST`, or `None` for somebody the form is for."""
         if not self.closed:
-            return True
+            return OWNER
         for crumb in headers.get("cookie", "").split(";"):
             name, _, value = crumb.strip().partition("=")
-            if name == COOKIE and hmac.compare_digest(value, self._token):
-                return True
-        return False
+            if name != COOKIE:
+                continue
+            if hmac.compare_digest(value, self._token):
+                return OWNER
+            if self.guests and value == GUEST:
+                return GUEST
+        return None
 
     def admits(self, password: str) -> bool:
         return self.closed and hmac.compare_digest(_mint(password or ""), self._token)
 
-    def crumb(self, secure: bool) -> str:
+    def crumb(self, secure: bool, guest: bool = False) -> str:
         """The Set-Cookie line that lets this browser back in.
 
         `HttpOnly` keeps it away from the page's own javascript, and `Lax`
@@ -55,7 +73,7 @@ class Gate:
         page would be a cross-site request that writes on your tablet.
         """
         parts = [
-            f"{COOKIE}={self._token}",
+            f"{COOKIE}={GUEST if guest else self._token}",
             "Path=/",
             "HttpOnly",
             "SameSite=Lax",
@@ -70,7 +88,7 @@ def _mint(password: str) -> str:
     return hmac.new(password.encode(), b"riddle-v1", hashlib.sha256).hexdigest()
 
 
-def page(wrong: bool = False) -> bytes:
+def page(wrong: bool = False, guests: bool = False) -> bytes:
     """The whole login page: no build step, no javascript, one field.
 
     It is served in place of whatever was asked for, with a 401, so a page
@@ -79,6 +97,16 @@ def page(wrong: bool = False) -> bytes:
     """
     note = (
         '<p class="no">that is not it</p>' if wrong else ""
+    )
+    # A second form rather than a link: a guest is a cookie, and a GET that
+    # sets one is a GET a crawler or a prefetch can follow.
+    guest = (
+        '<form method="post" action="/api/guest" class="guest">'
+        '<button type="submit">look around as a guest</button>'
+        "<p>everything written so far, and what is written next. "
+        "read only: nothing you do reaches the pen.</p>"
+        "</form>"
+        if guests else ""
     )
     return f"""<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -94,7 +122,8 @@ def page(wrong: bool = False) -> bytes:
     background: var(--paper); color: var(--ink); padding: 24px;
     font: 16px/1.5 ui-serif, Georgia, serif;
   }}
-  form {{ width: min(22rem, 100%); display: grid; gap: 12px; }}
+  main {{ width: min(22rem, 100%); display: grid; gap: 28px; }}
+  form {{ display: grid; gap: 12px; }}
   h1 {{ font-size: 1.25rem; font-weight: 500; margin: 0 0 4px; }}
   p {{ margin: 0; opacity: .7; font-size: .9rem; }}
   .no {{ opacity: 1; color: #c0392b; }}
@@ -103,7 +132,10 @@ def page(wrong: bool = False) -> bytes:
     border: 1px solid var(--line); background: transparent; color: inherit;
   }}
   button {{ cursor: pointer; background: var(--ink); color: var(--paper); border: 0; }}
+  .guest {{ border-top: 1px solid var(--line); padding-top: 24px; }}
+  .guest button {{ background: transparent; color: inherit; border: 1px solid var(--line); }}
 </style>
+<main>
 <form method="post" action="/api/login">
   <h1>riddle</h1>
   <p>this diary is not open to everyone.</p>
@@ -112,4 +144,6 @@ def page(wrong: bool = False) -> bytes:
          aria-label="password" placeholder="password">
   <button type="submit">open it</button>
 </form>
+{guest}
+</main>
 </html>""".encode()

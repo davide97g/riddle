@@ -3,6 +3,7 @@ import { Composer } from '@/components/Composer'
 import { ConnectionBadge } from '@/components/ConnectionBadge'
 import { DiaryButton } from '@/components/DiaryButton'
 import { EraseButton } from '@/components/EraseButton'
+import { GuestNote } from '@/components/GuestNote'
 import { PageMenu } from '@/components/PageMenu'
 import { PhoneMenu } from '@/components/PhoneMenu'
 import { SendToTablet } from '@/components/SendToTablet'
@@ -23,10 +24,14 @@ export default function App() {
   // Live is dead unless the server says it may read the screen: that is
   // RIDDLE_ALLOW_SNAP. It does not need the diary -- the feed is its own
   // connection -- so it stays open when the book in the header is shut.
+  // A guest is kept off it by the server: somebody watching is somebody the
+  // diary keeps its hands off the page for.
   const liveOff =
     state.conn !== 'open'
       ? 'Not connected, so there is nothing to watch.'
-      : state.live
+      : state.guest
+        ? 'Live is for whoever holds the pen: while anybody watches, the diary stops answering.'
+        : state.live
         ? undefined
         : 'The server may not read the screen: set RIDDLE_ALLOW_SNAP=1.'
 
@@ -45,13 +50,19 @@ export default function App() {
           </h1>
           <PageMenu current="diary" off={{ live: liveOff }} />
         </div>
-        <div className="flex items-center gap-2">
-          <DiaryButton />
-          <SendToTablet />
-          <ConnectionBadge />
-          <EraseButton />
-          <PhoneMenu microphone={microphone} />
-        </div>
+        {state.guest ? (
+          <div className="flex items-center gap-2">
+            <ConnectionBadge />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <DiaryButton />
+            <SendToTablet />
+            <ConnectionBadge />
+            <EraseButton />
+            <PhoneMenu microphone={microphone} />
+          </div>
+        )}
       </header>
       {state.conn === 'closed' && (
         <Alert className="drop-in rounded-none border-x-0 border-t-0">
@@ -62,7 +73,7 @@ export default function App() {
         </Alert>
       )}
       <Timeline />
-      <Composer microphone={microphone} />
+      {state.guest ? <GuestNote /> : <Composer microphone={microphone} />}
       <Splash onDone={done} />
     </div>
   )

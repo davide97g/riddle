@@ -72,7 +72,7 @@ is routed.
 | Route | Returns |
 |---|---|
 | `GET /api/health` | `{ok, session}` |
-| `GET /api/state` | `{session, started_ms, now_ms, listening, live, vanish, watched, diary:{present, ago_ms, manager, busy}}` |
+| `GET /api/state` | `{guest, session, started_ms, now_ms, listening, live, vanish, watched, diary:{present, ago_ms, manager, busy}}` |
 | `GET /api/events?since=&limit=` | `{events:[DiaryEvent]}`, limit capped at 500 |
 | `GET /api/captures/<name>` | a png from `var/captures`, path-traversal checked on the resolved path |
 | `GET /api/intent/<id>` | `{id, state, result}` |
@@ -81,6 +81,8 @@ is routed.
 | `POST /api/understand` | a png as the body, a snapshot from `/live`. Asks `RIDDLE_UNDERSTAND_MODEL` what is on it: `{title, kind, summary, points[], transcript, model, took_ms}`. `400` for anything but a png, `502` with the model's own complaint |
 | `POST /api/library?name=` | the raw file as the body: a pdf, an epub or an image. Puts it in the tablet's library and restarts xochitl, and answers once it is back: `{id, name, kind, pages, bytes}`. `400` for a file it cannot use, `409` while another is going in, `413` over 64MB (refused on the headers, before the body is read), `502` with the tablet's own complaint |
 | `POST /api/login` | form-encoded `password`; `303` to `/` with the cookie, or the form again with `401` |
+| `POST /api/guest` | no body; `303` to `/` with the guest cookie. `404` unless `RIDDLE_WEB_GUESTS` is on |
+| `GET /login` | the login form, for a guest who has the password after all |
 | anything else | the built client, with index as the fallback so routing works: `/live` is the live page, anything else the timeline |
 
 There is deliberately **no route for `var/audio`**. Those files are a
@@ -98,6 +100,16 @@ A cookie rather than HTTP Basic because the browser's WebSocket API cannot
 send an `Authorization` header, and `/ws/events` is the whole feed and the
 send path both. The token is one-way and deterministic: a restart logs nobody
 out, nothing is stored on disk, and changing the password is what revokes it.
+
+With `RIDDLE_WEB_GUESTS` on as well, the form has a second button, and
+`POST /api/guest` sets `riddle=guest`. That cookie is not a secret -- anyone
+may press the button -- so the server, never the page, holds a guest to
+reading: every method but `GET`/`HEAD` is `403 {"error":"read only"}`,
+`/ws/audio` is refused before the upgrade, `/ws/live` is upgraded and closed
+with `1008` (somebody watching is somebody the diary stops answering for),
+and on `/ws/events` anything but `hello` and `ping` is answered with
+`error {message: "read only"}` and dropped. `hello.ok` carries `guest: true`
+so the page can leave out what would be refused.
 
 ### `/ws/events` — text, both ways
 
@@ -119,7 +131,7 @@ Server to client:
 |---|---|
 | `vanish {on}` | the switch on the main page was turned, here or on another page |
 | `watched {by}` | somebody opened the page on `/live` (`by: "live"`), or the last one left (`null`). Read from the `live.watching` beat and sent on every change. While it is set the diary lets every pause go and refuses a send, and the main page says why |
-| `hello.ok {session, started_ms, now_ms, listening, live, vanish, watched, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP`; `vanish` is the switch, `null` until a page has set it; `watched` is as above |
+| `hello.ok {guest, session, started_ms, now_ms, listening, live, vanish, watched, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP`; `vanish` is the switch, `null` until a page has set it; `watched` is as above |
 | `event {...DiaryEvent}` | one row of the timeline |
 | `pong {t}` | |
 | `diary {present, ago_ms, manager, busy}` | the half that owns the pen came, went, or is being started or stopped. Sent on every change |
