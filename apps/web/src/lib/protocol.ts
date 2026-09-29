@@ -29,6 +29,10 @@ export type DiaryEvent = {
  *  promises an answer that nothing is there to give. */
 export type DiaryPresence = {
   present: boolean
+  /** whether the loop has the tablet. It beats while it waits for one, so
+   *  `present` alone promises a send or an erase nothing will serve. Absent
+   *  from a server older than this field, which is read as yes */
+  tablet?: boolean
   ago_ms: number | null
   /** who runs that half on the server: a systemd user unit, or the server
    *  itself with a pidfile. A stop under systemd is a request to a

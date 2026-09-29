@@ -2,6 +2,10 @@ import type { DiaryEvent, DiaryPresence, Row, ServerMessage, Watcher } from '@/l
 
 export type Conn = 'connecting' | 'open' | 'closed'
 
+/** Whether anything will serve a send or an erase: the loop is running and
+ *  has the tablet. */
+export const serving = (d: DiaryPresence) => d.present && d.tablet !== false
+
 export type State = {
   /** highest event id applied, and what `hello` resumes from */
   seq: number

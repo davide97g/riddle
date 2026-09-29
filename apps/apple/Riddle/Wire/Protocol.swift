@@ -63,6 +63,13 @@ nonisolated struct DiaryPresence: Codable, Sendable, Equatable {
     var manager: String
     /// a start or stop asked from a page is still running
     var busy: Bool
+    /// whether the loop has the tablet. It beats while it waits for one, so
+    /// `present` alone promises a send or an erase nothing will serve.
+    /// nil from a server older than this field, which is read as yes
+    var tablet: Bool? = nil
+
+    /// anything will serve a send or an erase
+    var serving: Bool { present && tablet != false }
 
     static let unknown = DiaryPresence(present: false, ago_ms: nil, manager: "here", busy: false)
 }

@@ -72,7 +72,7 @@ is routed.
 | Route | Returns |
 |---|---|
 | `GET /api/health` | `{ok, session}` |
-| `GET /api/state` | `{guest, session, started_ms, now_ms, listening, live, vanish, watched, diary:{present, ago_ms, manager, busy}}` |
+| `GET /api/state` | `{guest, session, started_ms, now_ms, listening, live, vanish, watched, diary:{present, tablet, ago_ms, manager, busy}}` |
 | `GET /api/events?since=&limit=` | `{events:[DiaryEvent]}`, limit capped at 500 |
 | `GET /api/captures/<name>` | a png from `var/captures`, path-traversal checked on the resolved path |
 | `GET /api/intent/<id>` | `{id, state, result}` |
@@ -134,7 +134,7 @@ Server to client:
 | `hello.ok {guest, session, started_ms, now_ms, listening, live, vanish, watched, diary}` | the greeting. `live` is whether `/ws/live` will serve, which is `RIDDLE_ALLOW_SNAP`; `vanish` is the switch, `null` until a page has set it; `watched` is as above |
 | `event {...DiaryEvent}` | one row of the timeline |
 | `pong {t}` | |
-| `diary {present, ago_ms, manager, busy}` | the half that owns the pen came, went, or is being started or stopped. Sent on every change |
+| `diary {present, tablet, ago_ms, manager, busy}` | the half that owns the pen came, went, lost or found the tablet, or is being started or stopped. Sent on every change of `present` or `tablet`. `tablet` is false while the loop is waiting for the tablet: it still beats then, so `present` alone would let a page send or erase into an intent nothing serves until the link is back, and one older than two minutes is dropped with an `error` |
 | `hearing {on}` | the energy gate opened or closed |
 | `pending {clip, on}` | a clip is with the speech model |
 | `intent.ok {id, at_ms}` | a send was recorded, and this is its id |

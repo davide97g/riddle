@@ -234,10 +234,12 @@ struct EraseButton: View {
     @State private var asking = false
 
     var body: some View {
-        let ready = diary.conn == .open && diary.diary.present
+        let ready = diary.conn == .open && diary.diary.serving
         Button { asking = true } label: { Image(systemName: "eraser") }
             .disabled(!ready)
-            .help(ready ? "Erase this conversation" : "The diary is not running, so nothing can rub the page out.")
+            .help(ready ? "Erase this conversation"
+                  : diary.diary.present ? "The diary is waiting for the tablet, so nothing can rub the page out yet."
+                  : "The diary is not running, so nothing can rub the page out.")
             .accessibilityLabel("Erase this conversation")
             .confirmationDialog("Erase this conversation?", isPresented: $asking, titleVisibility: .visible) {
                 Button("Erase", role: .destructive) { diary.clear() }

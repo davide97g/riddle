@@ -89,7 +89,7 @@ See below.
 **`state`** — small shared facts neither half owns. `asr.inflight` is how
 the loop knows a sentence is still with the speech model. `diary.vanish` is
 the switch on the main page, absent until a page first sets it, which the
-loop reads as on. `live.watching` is the wall-clock ms of the newest beat
+loop reads as on. `diary.tablet` is whether the loop has the tablet right now, false from the moment it starts waiting for it until it answers; it is what the page's `diary.tablet` is read from, because a waiting loop still beats. `live.watching` is the wall-clock ms of the newest beat
 from a page watching `/live`, or null once the last one left; the loop keeps
 its hands off the page while it is under fifteen seconds old. See
 [loop.md](loop.md#when-the-diary-keeps-its-hands-off).

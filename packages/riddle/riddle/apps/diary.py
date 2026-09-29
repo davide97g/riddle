@@ -238,7 +238,13 @@ class Session:
         cosmetic. A second diary refuses to start while the first one is
         beating, and that refusal is the only thing standing between one
         digitizer and two ssh pipes interleaving strokes into it.
+
+        Which is also why the beat cannot be what tells the page it may send
+        or erase: a loop waiting for the tablet beats, and serves nothing. So
+        the link itself is kept in the store, as `diary.tablet`, and the page
+        reads the two together.
         """
+        self.store.set_state("diary.tablet", False)
 
         def waiting(tries: int, delay: float) -> None:
             if tries == 1:
@@ -249,6 +255,7 @@ class Session:
             self.beat()
 
         device = agent.connect(self.cfg.ssh_host, on_wait=waiting)
+        self.store.set_state("diary.tablet", True)
         print(f"tablet answered on {self.cfg.ssh_host}", file=sys.stderr)
         return device
 
@@ -484,6 +491,15 @@ class Session:
         stale = self.store.expire_intents(
             self.store.now_ms() - INTENT_TTL_MS, "nobody was listening"
         )
+        for dropped in stale:
+            # Failed like any other intent, so said like any other failure:
+            # the page cleared its rows the moment Erase was pressed, and
+            # this is the only way it learns they are coming back.
+            self.store.add_event(
+                "error",
+                text=f"dropped a {dropped['action']} nobody served in time",
+                meta={"intent": dropped["id"]},
+            )
         if stale:
             print(f"dropped {len(stale)} stale intent(s)", file=sys.stderr)
 

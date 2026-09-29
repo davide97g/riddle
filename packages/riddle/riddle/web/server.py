@@ -45,7 +45,7 @@ class Hub:
         # What the pages have been told about the half that owns the pen, and
         # the callable that says what is true. Set by the server; `None` until
         # then, so the first tick always says it once.
-        self.diary_was: bool | None = None
+        self.diary_was: tuple | None = None
         # Who has the page open on /live, as last told. Starts
         # unknown rather than None so the first poll says it either way.
         self.watcher_was: str | None | bool = False
@@ -129,9 +129,10 @@ class Hub:
         if self.diary_now is None:
             return
         state = self.diary_now()
-        if state["present"] == self.diary_was:
+        was = (state["present"], state["tablet"])
+        if was == self.diary_was:
             return
-        self.diary_was = state["present"]
+        self.diary_was = was
         await self.say({"type": "diary", **state})
 
 
@@ -438,7 +439,9 @@ class Server:
         """Whether the half that owns the pen is running, and who runs it.
 
         Without the first the page promises that Send will be answered even
-        when nothing is listening, and the intent simply waits. The second is
+        when nothing is listening, and the intent simply waits. `tablet` is
+        the same promise one step further: a loop that has lost the tablet
+        still beats, and still serves nothing. The second is
         what the page's start and stop go through, and it is worth showing:
         under systemd a stop is a request to a supervisor that may bring it
         straight back, and that is a different promise from a kill.
@@ -446,6 +449,8 @@ class Server:
         ago_ms = self.store.present("loop")
         return {
             "present": ago_ms is not None,
+            # Beating is not serving: a loop waiting for the tablet beats.
+            "tablet": ago_ms is not None and self.store.get_state("diary.tablet") is True,
             "ago_ms": ago_ms,
             "manager": process.manager("diary"),
             "busy": self.working,

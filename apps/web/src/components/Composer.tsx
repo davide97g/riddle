@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { VanishSwitch } from '@/components/VanishSwitch'
 import type { Microphone } from '@/hooks/useMicrophone'
 import { useDiary } from '@/state/RiddleProvider'
+import { serving } from '@/state/reducer'
 
 /** What the diary is told, and how.
  *
@@ -24,6 +25,8 @@ export function Composer({ microphone }: { microphone: Microphone }) {
       ? 'The page is open on Live, so the diary leaves it alone. Close Live to write to it.'
       : !state.diary.present
         ? 'The diary is not running, so nothing would answer a send.'
+        : !serving(state.diary)
+          ? 'The diary is waiting for the tablet. Wake it, or check it is on the wifi.'
         : !state.listening
           ? 'No speech model loaded, so the microphone is off.'
           : null
@@ -55,7 +58,7 @@ export function Composer({ microphone }: { microphone: Microphone }) {
         />
         <Button
           onClick={send}
-          disabled={offline || !state.diary.present || !state.vanish || state.watched !== null}
+          disabled={offline || !serving(state.diary) || !state.vanish || state.watched !== null}
           className="h-11 transition-transform duration-150 ease-out active:scale-[0.97] disabled:active:scale-100"
         >
           Send
@@ -87,7 +90,7 @@ export function Composer({ microphone }: { microphone: Microphone }) {
         {/* Keyed on the sentence: the reason you cannot send changes while
             you are reading it, and a swap without a fade reads as a glitch. */}
         <p
-          key={`${state.diary.present}-${state.listening}-${state.vanish}-${state.watched}`}
+          key={`${state.diary.present}-${state.diary.tablet}-${state.listening}-${state.vanish}-${state.watched}`}
           className={`row-in text-center text-xs text-muted-foreground ${problem ? '' : 'max-sm:hidden'}`}
         >
           {problem ?? 'Send asks the diary for an answer now. It always answers on the tablet.'}

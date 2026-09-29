@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useDiary } from '@/state/RiddleProvider'
+import { serving } from '@/state/reducer'
 
 /** Start again: the ink off the page, the conversation dropped, the timeline
  *  deleted. It asks first, because only one of those three can be undone and
@@ -20,7 +21,7 @@ import { useDiary } from '@/state/RiddleProvider'
 export function EraseButton() {
   const { state, clear } = useDiary()
   const [asking, setAsking] = useState(false)
-  const ready = state.conn === 'open' && state.diary.present
+  const ready = state.conn === 'open' && serving(state.diary)
 
   return (
     <>
@@ -35,7 +36,9 @@ export function EraseButton() {
         title={
           ready
             ? 'Erase this conversation'
-            : 'The diary is not running, so nothing can rub the page out.'
+            : state.diary.present
+              ? 'The diary is waiting for the tablet, so nothing can rub the page out yet.'
+              : 'The diary is not running, so nothing can rub the page out.'
         }
       >
         {/* The eraser tips into the page on hover, the way you would hold

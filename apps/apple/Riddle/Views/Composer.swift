@@ -12,7 +12,7 @@ struct Composer: View {
     var body: some View {
         @Bindable var diary = diary
         let offline = diary.conn != .open
-        let canSend = !offline && diary.diary.present && diary.vanish && diary.watched == nil
+        let canSend = !offline && diary.diary.serving && diary.vanish && diary.watched == nil
 
         VStack(spacing: 8) {
             HStack(alignment: .bottom, spacing: 8) {
@@ -75,6 +75,7 @@ struct Composer: View {
         if !diary.vanish { return "Vanishing is off: what you write stays on the page, and the diary does not answer." }
         if diary.watched == .live { return "The page is open on Live, so the diary leaves it alone. Close Live to write to it." }
         if !diary.diary.present { return "The diary is not running, so nothing would answer a send." }
+        if !diary.diary.serving { return "The diary is waiting for the tablet. Wake it, or check it is on the wifi." }
         if !diary.listening { return "No speech model loaded, so the microphone is off." }
         return nil
     }

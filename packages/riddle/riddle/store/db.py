@@ -468,7 +468,7 @@ class Store:
         )
         return done.rowcount
 
-    def expire_intents(self, older_than_ms: int, reason: str) -> list[int]:
+    def expire_intents(self, older_than_ms: int, reason: str) -> list[dict]:
         """Discard pending intents nobody served in time.
 
         A send pressed forty minutes ago, while the tablet was unplugged, must
@@ -476,10 +476,10 @@ class Store:
         """
         rows = self.conn.execute(
             "UPDATE intents SET state = 'failed', result = ?, done_ms = ?"
-            " WHERE state = 'pending' AND made_ms < ? RETURNING id",
+            " WHERE state = 'pending' AND made_ms < ? RETURNING id, action",
             (json.dumps({"error": reason}), self.now_ms(), older_than_ms),
         ).fetchall()
-        return [row["id"] for row in rows]
+        return [{"id": row["id"], "action": row["action"]} for row in rows]
 
     def finish_intent(self, intent_id: int, *, ok: bool = True, result=None) -> None:
         self.conn.execute(
