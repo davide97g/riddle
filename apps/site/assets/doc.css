@@ -1,0 +1,61 @@
+/* The two text pages, /privacy and /setup: the landing page's paper and ink,
+   one column, nothing moving. Tokens are site.css's own, repeated because
+   these pages load nothing else. */
+
+@font-face {
+  font-family: "Geist";
+  src: url("/assets/fonts/geist.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --paper: #f2f2ef;
+  --surface: #fbfbf9;
+  --ink: #17171b;
+  --graphite: #56565e;
+  --rule: rgb(23 23 27 / 0.1);
+  --live: #14966b;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #111113;
+    --surface: #1b1b1f;
+    --ink: #ececE7;
+    --graphite: #a3a3ab;
+    --rule: rgb(236 236 231 / 0.1);
+    --live: #3ccb97;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 17px/1.6 "Geist", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 720px; margin: 0 auto; padding: 48px 20px 80px; }
+.back { color: var(--graphite); text-decoration: none; font-size: 15px; }
+.back:hover { color: var(--ink); }
+h1 { font-size: clamp(30px, 6vw, 40px); line-height: 1.15; letter-spacing: -0.02em; margin: 28px 0 8px; }
+h2 { font-size: 21px; letter-spacing: -0.01em; margin: 40px 0 8px; }
+h3 { font-size: 17px; margin: 24px 0 4px; }
+p, li { color: var(--graphite); }
+strong { color: var(--ink); font-weight: 600; }
+a { color: var(--live); }
+.lede { font-size: 19px; color: var(--ink); }
+.updated { font-size: 14px; color: var(--graphite); }
+code, pre { font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
+code { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 1px 5px; }
+pre { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
+pre code { background: none; border: 0; padding: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--rule); }
+th { color: var(--ink); font-weight: 600; }
+td { color: var(--graphite); }
+.table { overflow-x: auto; }
+footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14px; color: var(--graphite); }

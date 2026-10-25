@@ -1,0 +1,16 @@
+# The image is the server: the package, the agent's source and the page.
+# Nothing private (var/, .env) and nothing it does not run.
+.git
+.env
+var/
+.venv/
+**/node_modules/
+**/__pycache__/
+apps/web/dist/
+apps/apple/
+apps/video/
+apps/site/
+marketing/
+scripts/backup/
+deploy/docker/ssh/
+deploy/docker/riddle.env

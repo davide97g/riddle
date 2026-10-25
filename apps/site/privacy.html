@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>riddle privacy policy</title>
+  <meta name="description" content="What the riddle app and a riddle server keep, what they send and to whom. There is no account, no analytics and no server of ours.">
+  <link rel="canonical" href="https://get-riddle.davideghiotto.it/privacy">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="stylesheet" href="/assets/doc.css">
+</head>
+<body>
+<main>
+  <a class="back" href="/">&larr; riddle</a>
+  <h1>Privacy</h1>
+  <p class="updated">Updated 25 October 2026. Applies to the riddle app for iPhone, iPad and Mac, and to the riddle server software.</p>
+
+  <p class="lede">riddle has no account, no analytics, no advertising and no server of ours. The app talks only to the riddle server <strong>you</strong> run and type the address of. We, the developer, receive nothing from it.</p>
+
+  <h2>Who</h2>
+  <p>riddle is made by Davide Ghiotto, an individual developer. Questions about this policy: <a href="https://github.com/davide97g/riddle/issues">github.com/davide97g/riddle/issues</a>.</p>
+
+  <h2>What the app keeps on your device</h2>
+  <ul>
+    <li><strong>The server's address</strong> and three preferences: which microphone, whether the ink vanishes, and how Live shows the page. In the app's own settings.</li>
+    <li><strong>A sign-in token</strong> made from your server's password, in the Keychain. The password itself is never stored.</li>
+    <li><strong>Up to ten snapshots</strong> of your tablet's page, only if you take them on the Live tab, in the app's own storage. Delete one from the shelf and the file goes.</li>
+  </ul>
+  <p>"Forget this server" in Settings removes the address and the token. Deleting the app removes everything.</p>
+
+  <h2>What the app sends, and where</h2>
+  <p>Only to the server address you entered, and only when you act:</p>
+  <ul>
+    <li><strong>Your voice</strong>, while you hold the microphone button, streamed to your server to be transcribed there.</li>
+    <li><strong>Notes you type</strong> and the Send and Erase buttons.</li>
+    <li><strong>A photo or file you choose</strong> to put on the tablet. A photo taken with the camera for this is not saved to your library.</li>
+    <li><strong>A snapshot you press Understand on.</strong></li>
+  </ul>
+  <p>The app sends nothing to the developer, to Apple beyond what iOS and macOS do for every app, or to any third party.</p>
+
+  <h2>What your server does with it</h2>
+  <p>The server is software you run on your own computer, and what it keeps stays there: the timeline of what was written, said and answered, photographs of your handwriting, and recordings of what was said near the microphone (deleted after seven days unless you change it). The full list, and how to delete each part, is in <a href="https://github.com/davide97g/riddle/blob/main/docs/privacy.md">docs/privacy.md</a>.</p>
+  <p><strong>To write the diary's replies, your server sends a photograph of what you wrote, and the transcript of what was said near the microphone at that moment, to an AI model:</strong> OpenAI's API by default, with your own API key, or any other provider you configure. That provider's own privacy policy applies to what it receives (for OpenAI: <a href="https://openai.com/policies/row-privacy-policy/">openai.com/policies</a>). The app shows this before you connect it to a server, and connecting is your agreement to it. Anything said near the microphone while it is on becomes part of the question, including other people in the room.</p>
+
+  <h2>Permissions the app asks for</h2>
+  <div class="table"><table>
+    <tr><th>Permission</th><th>Used for</th></tr>
+    <tr><td>Microphone</td><td>Speaking to the diary, only while you hold the button.</td></tr>
+    <tr><td>Camera (iPhone, iPad)</td><td>Taking a photo to put on the tablet as a page. Not kept on the device.</td></tr>
+    <tr><td>Local network</td><td>Reaching your server when it is on your home network.</td></tr>
+  </table></div>
+  <p>Photos you pick from your library are chosen through the system picker; the app sees only the ones you pick.</p>
+
+  <h2>The demo server</h2>
+  <p>The developer runs one demo server, with no tablet behind it and invented pages, so the app can be tried (and reviewed) without one. Anything typed or said on it is stored on that server, sent to OpenAI to write a reply as above, and wiped when the demo is reset. Do not put anything personal into it.</p>
+
+  <h2>Children</h2>
+  <p>riddle is not directed at children under 13 and collects nothing from anyone.</p>
+
+  <h2>Changes</h2>
+  <p>Changes to this policy are made on this page, with the date above, and are visible in the project's history on GitHub.</p>
+
+  <footer>Not affiliated with reMarkable AS. reMarkable is a trademark of reMarkable AS.</footer>
+</main>
+</body>
+</html>

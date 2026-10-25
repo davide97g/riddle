@@ -1,4 +1,6 @@
-// riddled - reMarkable 2 side agent for the Tom Riddle diary.
+// riddled - reMarkable 2 side agent for the Tom Riddle diary. It may well
+// run on a reMarkable 1 too, which has the same Wacom digitizer, but nobody
+// has watched it do so; docs/tablets.md says which models are which.
 //
 // The tablet ships no python at all on firmware 3.28 (and on 3.15 before it,
 // a build stripped of ctypes, socket, fcntl and mmap), and rm2fb cannot be
@@ -10,6 +12,19 @@
 // input core with input_inject_event(), so xochitl sees our synthetic strokes
 // as if they came from the pen itself. That is what lets the diary erase what
 // you wrote and answer in ink without touching the framebuffer.
+//
+// Which node is the pen is asked, not assumed. The rM2 numbers its inputs
+// power button, pen, touch, so its pen is event1; the rM1 numbers them pen,
+// touch, buttons, so the same path there is the touchscreen, and every stroke
+// would be written into a device that does not understand it. So at startup
+// each /dev/input/event* is asked what it can report: the pen is the node with
+// BTN_TOOL_PEN and absolute X, Y and pressure, the touchscreen the one with
+// multitouch positions and no pen. Those bits are exactly what this file is
+// about to write, which is why they decide; the names the kernel gives the
+// nodes (`Wacom I2C Digitizer` on both models, `pt_mt` on the rM2,
+// `cyttsp5_mt` on the rM1) only break a tie, because a name is whatever the
+// driver author chose. If nothing answers to the description the rM2's own
+// paths are used, so a tablet this cannot read behaves exactly as before.
 
 #include <errno.h>
 #include <fcntl.h>
@@ -23,8 +38,12 @@
 #include <time.h>
 #include <unistd.h>
 
-#define PEN_DEVICE "/dev/input/event1"
-#define TOUCH_DEVICE "/dev/input/event2"
+// The rM2's layout, and the answer when no node looks like a pen or a finger.
+#define PEN_FALLBACK "/dev/input/event1"
+#define TOUCH_FALLBACK "/dev/input/event2"
+
+// How far to look. A tablet has three or four nodes; this is generous.
+#define INPUT_NODES 32
 
 static int pen_fd = -1;
 static int touch_fd = -1;
@@ -180,6 +199,90 @@ static void tap(int x, int y, int hold_ms) {
     emit_to(touch_fd, EV_SYN, SYN_REPORT, 0);
 }
 
+#define BITS_PER_LONG (8 * sizeof(unsigned long))
+#define NLONGS(bits) (((bits) + BITS_PER_LONG) / BITS_PER_LONG)
+
+static int has_bit(const unsigned long *bits, int bit) {
+    return (bits[bit / BITS_PER_LONG] >> (bit % BITS_PER_LONG)) & 1;
+}
+
+enum { NODE_OTHER, NODE_PEN, NODE_TOUCH };
+
+// What a node is, read off the events it says it can produce. A failed ioctl
+// leaves the bitmap empty, which makes the node nothing rather than a guess.
+static int node_kind(int fd) {
+    unsigned long keys[NLONGS(KEY_MAX)];
+    unsigned long abs[NLONGS(ABS_MAX)];
+    memset(keys, 0, sizeof(keys));
+    memset(abs, 0, sizeof(abs));
+    ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys);
+    ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(abs)), abs);
+
+    int pen = has_bit(keys, BTN_TOOL_PEN);
+    if (pen && has_bit(abs, ABS_X) && has_bit(abs, ABS_Y) && has_bit(abs, ABS_PRESSURE))
+        return NODE_PEN;
+    if (!pen && has_bit(abs, ABS_MT_POSITION_X) && has_bit(abs, ABS_MT_POSITION_Y))
+        return NODE_TOUCH;
+    return NODE_OTHER;
+}
+
+static const char *const PEN_NAMES[] = {"Wacom I2C Digitizer", NULL};
+static const char *const TOUCH_NAMES[] = {"pt_mt", "cyttsp5_mt", NULL};
+
+static int known_name(const char *const *names, const char *name) {
+    for (; *names; names++)
+        if (strcmp(*names, name) == 0) return 1;
+    return 0;
+}
+
+struct node {
+    char path[32];
+    char name[80];
+    int score;    // 0 not found, 1 the right capabilities, 2 and a name we know
+};
+
+static void consider(struct node *best, const char *path, const char *name, int score) {
+    if (score <= best->score) return;    // equal scores: the lower number wins
+    snprintf(best->path, sizeof(best->path), "%s", path);
+    snprintf(best->name, sizeof(best->name), "%s", name);
+    best->score = score;
+}
+
+static void find_nodes(struct node *pen, struct node *touch) {
+    memset(pen, 0, sizeof(*pen));
+    memset(touch, 0, sizeof(*touch));
+    for (int i = 0; i < INPUT_NODES; i++) {
+        char path[32];
+        snprintf(path, sizeof(path), "/dev/input/event%d", i);
+        // Read-only and non-blocking: asking a node what it is must not wait
+        // on it, and must not take anything a reader like xochitl needs.
+        int fd = open(path, O_RDONLY | O_NONBLOCK);
+        if (fd < 0) continue;
+        char name[80];
+        memset(name, 0, sizeof(name));
+        if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0) name[0] = '\0';
+        int kind = node_kind(fd);
+        close(fd);
+        if (kind == NODE_PEN)
+            consider(pen, path, name, 1 + known_name(PEN_NAMES, name));
+        else if (kind == NODE_TOUCH)
+            consider(touch, path, name, 1 + known_name(TOUCH_NAMES, name));
+    }
+}
+
+// Say which nodes were taken only when it is news: on an rM2 the answer is
+// event1 and event2, as it always was, and the log stays as quiet as it was.
+static const char *pick(const struct node *found, const char *fallback, const char *what) {
+    if (!found->score) {
+        fprintf(stderr, "riddled: no input node looks like the %s; trying %s\n", what, fallback);
+        return fallback;
+    }
+    if (strcmp(found->path, fallback) != 0)
+        fprintf(stderr, "riddled: %s is %s (%s)\n", what, found->path,
+                found->name[0] ? found->name : "unnamed");
+    return found->path;
+}
+
 static void report_axis(const char *name, int axis) {
     struct input_absinfo info;
     if (ioctl(pen_fd, EVIOCGABS(axis), &info) == 0)
@@ -218,15 +321,20 @@ static void handle_command(char *line) {
 int main(void) {
     setvbuf(stdout, NULL, _IOLBF, 0);
 
-    pen_fd = open(PEN_DEVICE, O_RDWR);
+    struct node pen, touch;
+    find_nodes(&pen, &touch);
+    const char *pen_path = pick(&pen, PEN_FALLBACK, "pen");
+    const char *touch_path = pick(&touch, TOUCH_FALLBACK, "touchscreen");
+
+    pen_fd = open(pen_path, O_RDWR);
     if (pen_fd < 0) {
-        fprintf(stderr, "riddled: cannot open %s: %s\n", PEN_DEVICE, strerror(errno));
+        fprintf(stderr, "riddled: cannot open %s: %s\n", pen_path, strerror(errno));
         return 1;
     }
 
-    touch_fd = open(TOUCH_DEVICE, O_RDWR);
+    touch_fd = open(touch_path, O_RDWR);
     if (touch_fd < 0)
-        fprintf(stderr, "riddled: cannot open %s: %s\n", TOUCH_DEVICE, strerror(errno));
+        fprintf(stderr, "riddled: cannot open %s: %s\n", touch_path, strerror(errno));
 
     report_axis("X", ABS_X);
     report_axis("Y", ABS_Y);

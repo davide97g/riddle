@@ -57,9 +57,9 @@ nonisolated struct DiaryEvent: Codable, Sendable, Identifiable, Equatable {
 nonisolated struct DiaryPresence: Codable, Sendable, Equatable {
     var present: Bool
     var ago_ms: Int?
-    /// who runs that half on the server: a systemd user unit, or the server
-    /// itself with a pidfile. A stop under systemd is a request to a
-    /// supervisor, which is a weaker promise than a kill.
+    /// who runs that half on the server: `systemd` (a user unit), `launchd`
+    /// (an agent on a Mac), or `here`, the server itself with a pidfile. A
+    /// stop under a supervisor is a request to it, a weaker promise than a kill.
     var manager: String
     /// a start or stop asked from a page is still running
     var busy: Bool

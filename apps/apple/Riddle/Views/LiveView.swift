@@ -97,8 +97,11 @@ struct LiveView: View {
                     Label(feed.state == .refused ? "Not allowed" : "Waiting for the page",
                           systemImage: feed.state == .refused ? "eye.slash" : "rectangle.portrait")
                 } description: {
+                    // The server's own reason when it gave one: a demo server
+                    // has no tablet, and telling it to set a switch is wrong.
                     Text(feed.state == .refused
-                         ? "The server may not read the screen: set RIDDLE_ALLOW_SNAP=1."
+                         ? (feed.message.flatMap { $0.isEmpty ? nil : $0 }.map { $0.prefix(1).uppercased() + $0.dropFirst() + "." }
+                            ?? "The server may not read the screen: set RIDDLE_ALLOW_SNAP=1.")
                          : "The first frame arrives once the tablet answers.")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

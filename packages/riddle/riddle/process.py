@@ -58,6 +58,35 @@ def unit(service: Service) -> str:
     return f"riddle-{service.name}"
 
 
+def label(name: str) -> str:
+    """The launchd agent that runs this half on a Mac that is the server."""
+    return f"riddle.{name}"
+
+
+def plist(name: str) -> Path:
+    """Where `riddle service install` puts that agent, and how it is found.
+
+    The file rather than `launchctl print` is the test of who runs the half,
+    because a stop is a `bootout` and leaves nothing loaded: asked after a
+    stop, launchd would answer "nobody", and the next start from the page
+    would spawn a child that the agent then doubles at the next login.
+    """
+    return Path.home() / "Library" / "LaunchAgents" / f"{label(name)}.plist"
+
+
+def _launchctl(*argv: str, timeout: float = 20.0):
+    try:
+        return subprocess.run(
+            ["launchctl", *argv], capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _domain() -> str:
+    return f"gui/{os.getuid()}"
+
+
 def _systemctl(*argv: str, timeout: float = 20.0):
     try:
         return subprocess.run(
@@ -70,9 +99,10 @@ def _systemctl(*argv: str, timeout: float = 20.0):
 
 @lru_cache(maxsize=None)
 def manager(name: str) -> str:
-    """Who is expected to run this half *here*: `systemd`, or `here`.
+    """Who is expected to run this half *here*: `systemd`, `launchd`, or `here`.
 
-    On the box both halves are user units. A start that spawned a child
+    On the box both halves are user units; on a Mac that is somebody's
+    server they are launch agents (`riddle service install` writes either). A start that spawned a child
     beside the unit would put two ssh pipes into one digitizer, and a stop
     that went looking for a pidfile would find none and report success over
     a service that is still answering. So anything that wants to bring a
@@ -82,10 +112,37 @@ def manager(name: str) -> str:
     Memoised: a unit file does not appear halfway through a process, and the
     page asks about the loop four times a second.
     """
+    if sys.platform == "darwin":
+        return "launchd" if plist(name).is_file() else "here"
     done = _systemctl("show", f"riddle-{name}", "--property=LoadState", "--value")
     if done is not None and done.returncode == 0 and done.stdout.strip() == "loaded":
         return "systemd"
     return "here"
+
+
+def _launchd(service: Service, up: bool) -> tuple[int, str]:
+    """`bootstrap` or `bootout`, which is launchd's start and stop.
+
+    A `kickstart` would be the closer word for start, but it needs the agent
+    loaded, and a stopped one is not. Bootstrapping one that is already
+    loaded fails with "Input/output error"; that is the agent already
+    running, so it is passed on as a start that happened.
+    """
+    target = f"{_domain()}/{label(service.name)}"
+    if up:
+        done = _launchctl("bootstrap", _domain(), str(plist(service.name)), timeout=60.0)
+        if done is None:
+            return 1, "launchctl is not answering"
+        if done.returncode and _launchctl("print", target).returncode != 0:
+            return done.returncode, done.stderr.strip() or f"{target} did not start"
+        return 0, f"asked launchd for {label(service.name)}"
+    done = _launchctl("bootout", target, timeout=30.0)
+    if done is None:
+        return 1, "launchctl is not answering"
+    if done.returncode and _launchctl("print", target).returncode == 0:
+        return done.returncode, done.stderr.strip() or f"{target} did not stop"
+    forget_heartbeat(service)
+    return 0, f"asked launchd to stop {label(service.name)}"
 
 
 def begin(service: Service) -> tuple[int, str]:
@@ -95,6 +152,8 @@ def begin(service: Service) -> tuple[int, str]:
     rather than printing one, because on the other end of them is a browser
     and not a terminal.
     """
+    if manager(service.name) == "launchd":
+        return _launchd(service, True)
     if manager(service.name) == "systemd":
         done = _systemctl("start", unit(service), timeout=60.0)
         if done is None:
@@ -110,6 +169,8 @@ def begin(service: Service) -> tuple[int, str]:
 
 def end(service: Service, *, timeout: float = 6.0) -> tuple[int, str]:
     """Take a half down the way this machine runs it. `(code, what to say)`."""
+    if manager(service.name) == "launchd":
+        return _launchd(service, False)
     if manager(service.name) == "systemd":
         done = _systemctl("stop", unit(service), timeout=max(30.0, timeout))
         if done is None:

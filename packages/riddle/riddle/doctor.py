@@ -273,6 +273,71 @@ def _orphan_agents() -> int:
     return len(pids)
 
 
+# What /sys/devices/soc0/machine says on each reMarkable, and what this
+# project makes of it. docs/tablets.md is the home of this table and says why;
+# anything not named here -- the Paper Pro reports `reMarkable Ferrari`, the
+# Move `reMarkable Chiappa` -- is refused, because it is a different digitizer,
+# a different screen, a 64-bit cpu and a colour framebuffer all at once.
+SUPPORTED = ("reMarkable 2.0",)
+EXPERIMENTAL = ("reMarkable 1.0", "reMarkable Prototype 1")
+
+# The firmware the toolbar taps, the screen read and the injection numbers
+# were measured on. Its home is docs/device.md; this is a mirror.
+CALIBRATED_ON = "3.28"
+
+TABLETS_DOC = "docs/tablets.md"
+
+
+def _model(found: dict[str, str] | str) -> list[Result]:
+    """Which reMarkable this is, and whether this project is any use on it.
+
+    Every other tablet check assumes an rM2 without saying so: the digitizer's
+    range, the screen's size, the arm32 agent, the layout of xochitl's memory.
+    On another model those fail one at a time and in confusing ways -- a
+    stroke in the wrong place, a screen read of noise -- so the model is
+    asked first and an unsupported one stops the checks here. The firmware is
+    information rather than a verdict: a new one usually still works, but it
+    is the first suspect when taps miss or the screen read breaks.
+    """
+    if isinstance(found, str):
+        return [Result(WARN, "tablet", "model", f"could not ask the tablet: {found}")]
+    out = []
+    machine = found.get("machine", "")
+    if machine in SUPPORTED:
+        out.append(Result(OK, "tablet", "model", f"{machine}, supported and tested"))
+    elif machine in EXPERIMENTAL:
+        out.append(
+            Result(WARN, "tablet", "model",
+                   f"{machine}: experimental, untested -- same digitizer, never watched",
+                   f"read {TABLETS_DOC} before letting it draw")
+        )
+    elif not machine:
+        out.append(
+            Result(WARN, "tablet", "model", "the tablet did not say which model it is",
+                   f"cat /sys/devices/soc0/machine on it, and see {TABLETS_DOC}")
+        )
+    else:
+        out.append(
+            Result(FAIL, "tablet", "model",
+                   f"{machine}: not supported -- another digitizer, screen and cpu",
+                   f"see {TABLETS_DOC}")
+        )
+
+    release, build = found.get("release", ""), found.get("build", "")
+    if release:
+        detail = release + (f" (build {build})" if build else "")
+        if release == CALIBRATED_ON or release.startswith(CALIBRATED_ON + "."):
+            detail += ", the firmware this was calibrated on"
+        else:
+            detail += (f"; taps, screen read and injection were calibrated on "
+                       f"{CALIBRATED_ON}, see {TABLETS_DOC}")
+        out.append(Result(OK, "tablet", "firmware", detail))
+    else:
+        out.append(Result(OK, "tablet", "firmware",
+                          f"not reported (build {build or 'unknown'})"))
+    return out
+
+
 def check_tablet(quick: bool = False) -> list[Result]:
     if quick:
         return []
@@ -286,6 +351,12 @@ def check_tablet(quick: bool = False) -> list[Result]:
                    "riddle link to find one that does")
         ]
     out.append(Result(OK, "tablet", "route", cfg.ssh_host))
+    # Before the agent, which opens the digitizer: on a tablet this does not
+    # support there is nothing it could usefully report.
+    model = _model(probe.identify(cfg.ssh_host))
+    out.extend(model)
+    if any(result.status == FAIL for result in model):
+        return out
     timing = probe.agent_latency(cfg.ssh_host)
     if isinstance(timing, tuple):
         median, worst = timing

@@ -139,6 +139,25 @@ The `Secure` flag on the login cookie comes from `X-Forwarded-Proto`, which is
 cloudflared's word for it — the connection to the python process really is
 plain http, and the browser's really is not.
 
+## The demo server
+
+Beside the real diary, the box runs a second riddle that has no tablet:
+`deploy/docker/compose.demo.yml`, a Dokploy compose app like `apps/site`,
+published on the same tunnel as `riddle-demo.davideghiotto.it` (ingress
+`-> http://localhost:80`, Traefik routing by host, Dokploy's domain record
+pointing at container port 8765). It is what App Review signs in to.
+
+It is a container, unlike the real one, and that is the point here rather
+than a cost: it shares no checkout, no `var/`, no unit names and no ssh key
+with the diary above, so a reviewer pressing the book starts *its* loop,
+which has `RIDDLE_DEMO=1` and draws nowhere. Its password and its OpenAI key
+are in Dokploy's environment tab. [deploy/docker/README.md](../deploy/docker/README.md)
+has the rest, including how to reset it.
+
+The generic version of this whole page, for somebody else's server, is
+[self-hosting.md](self-hosting.md); `riddle service install` writes the two
+units above from a checkout, the same as the hand-made ones.
+
 ## What is *not* on the box
 
 - **`riddle device build`.** Cross-compiling the agent wants zig; the agent is

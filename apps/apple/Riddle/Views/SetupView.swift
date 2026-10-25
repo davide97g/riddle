@@ -35,10 +35,18 @@ struct ServerForm: View {
             Text("The address `riddle voice start` prints, the tailnet name `riddle voice share` gives, or the tunnel's https url. The password is kept only as the cookie it makes.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            // Said before anything is sent, every time, because the app
+            // cannot know what a server it has never met does with a page:
+            // the photograph of the handwriting and the words said near the
+            // microphone go to the server, and from there to whichever model
+            // it is set up with. Connecting is the agreement to that.
+            Text("Your server sends what you write and what you say near the microphone to the AI model it is set up with (OpenAI, unless you changed it) to write the diary's replies. Nothing goes anywhere else: there is no account and no server of ours.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Button(action: connect) {
                 HStack {
                     if trying { ProgressView().controlSize(.small) }
-                    Text(trying ? "Connecting…" : "Connect")
+                    Text(trying ? "Connecting…" : "Agree and Connect")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -78,6 +86,8 @@ struct SetupView: View {
                     .foregroundStyle(.secondary)
                 ServerForm()
                     .frame(maxWidth: 380)
+                Links()
+                    .frame(maxWidth: 380)
             }
             .padding(24)
             .frame(maxWidth: .infinity)
@@ -104,6 +114,29 @@ struct ServerSettings: View {
                     dismiss()
                 }
             }
+            Links()
         }
+    }
+}
+
+/// Where a server comes from, and what happens to what is on it. The app is
+/// half of something; without these it is a form asking for an address that
+/// nobody who has just downloaded it has.
+struct Links: View {
+    static let setup = URL(string: "https://get-riddle.davideghiotto.it/setup")!
+    static let privacy = URL(string: "https://get-riddle.davideghiotto.it/privacy")!
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("riddle needs a reMarkable 2 and a server of your own, on a Mac or a Linux machine at home.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 16) {
+                Link("Set up a server", destination: Self.setup)
+                Link("Privacy", destination: Self.privacy)
+            }
+            .font(.callout)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

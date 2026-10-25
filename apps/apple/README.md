@@ -27,6 +27,13 @@ For other Macs, `./package.sh` builds `build/Riddle-<version>.dmg`: signed
 with the Developer ID, notarized and stapled. It needs a notarytool profile
 called `riddle`; the script's header says how to store one.
 
+For the App Store, `./release.sh` archives both platforms with the team's
+automatic signing and `./release.sh --upload` sends them to App Store
+Connect; `./screenshots.sh` makes the store's screenshots in clean
+simulators against a demo container, never the real diary.
+[AppStore.md](AppStore.md) is every field of the submission, with the
+answers and the review notes.
+
 The icon is `Riddle/AppIcon.icon`, an Icon Composer document whose one layer
 `icon/make_icon.py` draws: the wordmark's own strokes, bent round a circle.
 Rerun it after changing the word or the bend, and look at the result with
@@ -38,7 +45,9 @@ types, which say so.
 
 ## Connect it
 
-The first screen asks for the server and its password:
+The first screen asks for the server and its password, says that the server
+sends what is written and said to its AI model, and links to the setup guide
+and the privacy policy. The button is *Agree and Connect*:
 
 - the address `riddle voice start` prints — `127.0.0.1:8765` on the same Mac;
 - a LAN or tailnet address, plain http. App Transport Security is off for
@@ -65,6 +74,7 @@ A microphone, unlike on the web, needs no https: the permission is the app's.
 | `Riddle/Model/LiveFeed.swift` | `/ws/live` |
 | `Riddle/Model/Microphone.swift` | `AVAudioEngine` to 16 kHz int16 mono, 200 ms frames numbered little-endian, on `/ws/audio` |
 | `Riddle/Model/Snapshots.swift` | the shelf: up to ten pngs in Application Support |
+| `Riddle/PrivacyInfo.xcprivacy` | the privacy manifest: no tracking, nothing collected, two required-reason APIs. A mirror of [docs/privacy.md](../../docs/privacy.md) |
 | `Riddle/Views/` | everything on screen. `Rows.swift` renders one row per event kind, and is checked for it |
 
 ## The rules it keeps

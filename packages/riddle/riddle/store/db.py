@@ -297,6 +297,19 @@ class Store:
 
     # --- turns -----------------------------------------------------------
 
+    def last_turn(self) -> int:
+        """The highest turn number this session has, 0 for none.
+
+        A loop restarted while the page kept the session alive joins it with
+        turns already in it, and numbering from one again collides with the
+        first of them on the unique index -- the loop died on its first
+        answer after every `systemctl restart riddle-diary`.
+        """
+        row = self.conn.execute(
+            "SELECT max(n) AS n FROM turns WHERE session_id = ?", (self.session_id,)
+        ).fetchone()
+        return row["n"] or 0
+
     def begin_turn(self, n: int, trigger: str, from_ms: int, to_ms: int) -> None:
         self.conn.execute(
             "INSERT INTO turns (session_id, n, trigger, from_ms, to_ms, started_ms)"

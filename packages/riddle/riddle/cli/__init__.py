@@ -40,6 +40,7 @@ GROUPS = (
     "web",
     "backup",
     "introspect",
+    "host",
 )
 
 

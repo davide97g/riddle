@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 
 
-from riddle.device.ssh import INTERACTIVE as SSH_OPTIONS
+from riddle.device.ssh import BASE as SSH_BASE, INTERACTIVE as SSH_OPTIONS
 
 USB = "10.11.99.1"
 MDNS = "remarkable.local"
@@ -47,6 +47,47 @@ def reachable(host: str, port: int = 22, timeout: float = 2.0) -> float | None:
             return time.monotonic() - started
     except OSError:
         return None
+
+
+# Asked in one ssh rather than three. Each line is labelled so a missing file
+# is an empty value rather than every later answer moving up by one. The
+# release number is in update.conf (this tablet's 3.15 backup has it there);
+# os-release's IMG_VERSION is a second place to look in case a firmware drops
+# that file, since /etc/version is only a build stamp and os-release's
+# VERSION_ID is Codex Linux's, not xochitl's.
+_IDENTIFY = (
+    'printf "machine=%s\\n" "$(cat /sys/devices/soc0/machine 2>/dev/null)"; '
+    'R=$(sed -n "s/^REMARKABLE_RELEASE_VERSION=//p" /usr/share/remarkable/update.conf 2>/dev/null); '
+    '[ -n "$R" ] || R=$(sed -n "s/^IMG_VERSION=//p" /etc/os-release 2>/dev/null | tr -d \'"\'); '
+    'printf "release=%s\\n" "$R"; '
+    'printf "build=%s\\n" "$(cat /etc/version 2>/dev/null)"'
+)
+
+
+def identify(host: str) -> dict[str, str] | str:
+    """Which reMarkable this is and what firmware it runs, or why not.
+
+    The model comes from the device tree rather than from anything xochitl
+    says, because it is the hardware that decides whether the agent's binary
+    runs and whether the digitizer is the one it was written for. Nothing here
+    opens an input device, so it is safe while the diary is drawing.
+    """
+    try:
+        done = subprocess.run(
+            ["ssh", *SSH_BASE, host, _IDENTIFY],
+            capture_output=True, text=True, timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return str(exc)
+    if done.returncode:
+        lines = [line.strip() for line in done.stderr.splitlines() if line.strip()]
+        return lines[-1] if lines else f"ssh exited {done.returncode}"
+    found = {}
+    for line in done.stdout.splitlines():
+        key, _, value = line.partition("=")
+        if key in ("machine", "release", "build"):
+            found[key] = value.strip()
+    return found
 
 
 def agent_latency(host: str) -> tuple[float, float] | str:

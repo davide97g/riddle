@@ -1,0 +1,26 @@
+# riddle's server, for a machine that runs containers. From the repository root:
+#
+#   cp deploy/docker/riddle.env.example deploy/docker/riddle.env   # and fill it in
+#   docker compose -f deploy/docker/compose.yml up -d --build
+#
+# The app and the page then connect to http://<this machine>:8765.
+services:
+  riddle:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: riddle
+    restart: unless-stopped
+    init: false            # tini is already the entrypoint
+    env_file: riddle.env
+    ports:
+      - "8765:8765"
+    volumes:
+      - riddle-data:/data
+      # The key the server uses for the tablet, and an ssh config naming it
+      # (riddle setup writes both on a normal machine; README.md here says
+      # how to make them by hand). Read-only; copied in at start.
+      - ./ssh:/ssh:ro
+
+volumes:
+  riddle-data:

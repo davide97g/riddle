@@ -58,3 +58,8 @@ web/.vite/
 *.zip
 *.tar
 *.tar.gz
+
+# The container's secrets: its settings and the tablet's ssh key.
+deploy/docker/riddle.env
+deploy/docker/ssh/*
+!deploy/docker/ssh/README

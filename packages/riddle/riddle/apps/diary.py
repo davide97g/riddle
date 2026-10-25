@@ -138,6 +138,32 @@ class NoStore:
         return nothing
 
 
+class NoTablet:
+    """The tablet, when there is none: `RIDDLE_DEMO`.
+
+    The loop around it is the same loop -- it claims intents, asks the model,
+    puts the reply on the timeline -- and the pen is this, which hears
+    nothing and draws nowhere. Nothing here dials ssh, and that is the point
+    of it rather than a shortcut: a demo server is one a stranger can log in
+    to, it holds no key to anybody's tablet, and it must not go looking for
+    one under whatever alias `.env` happens to name.
+    """
+
+    def __init__(self) -> None:
+        self.events: queue.Queue = queue.Queue()
+        # The loop asks the ssh process whether it died; this one never does.
+        self.proc = self
+
+    def poll(self) -> None:
+        return None
+
+    def __getattr__(self, name):
+        def nothing(*args, **kwargs):
+            return None
+
+        return nothing
+
+
 class Session:
     def __init__(self) -> None:
         cfg = config.get()
@@ -172,7 +198,9 @@ class Session:
         # Which end of the pen is on the page. The nib and the eraser both come
         # through as strokes; only the tool says which one was meant.
         self.tool = "pen"
-        self.turn = 0
+        # Carried on from the session, not restarted: the page may have kept
+        # it alive across this loop's restart, with its turns in it.
+        self.turn = self.store.last_turn() or 0
         self.last_turn_end_ms = -1
         self.last_turn_at = 0.0
         # Set while the diary is erasing and writing, so the page watcher does
@@ -244,6 +272,12 @@ class Session:
         the link itself is kept in the store, as `diary.tablet`, and the page
         reads the two together.
         """
+        if self.cfg.demo:
+            # The page reads this as "a send will be answered", and on a demo
+            # server it will be: on the timeline, which is the only page there is.
+            self.store.set_state("diary.tablet", True)
+            print("no tablet (RIDDLE_DEMO): answering on the timeline only", file=sys.stderr)
+            return NoTablet()
         self.store.set_state("diary.tablet", False)
 
         def waiting(tries: int, delay: float) -> None:
@@ -305,7 +339,7 @@ class Session:
 
     def run(self) -> None:
         cfg = self.cfg
-        uuid = notebook.find(cfg.notebook, cfg.ssh_host)
+        uuid = None if cfg.demo else notebook.find(cfg.notebook, cfg.ssh_host)
         found = f"({uuid[:8]})" if uuid else "(not found on device)"
         kept = len(self.memory.lines())
         print(
@@ -345,12 +379,13 @@ class Session:
         # conversation but not its memory. xochitl only writes a page out when
         # you leave it, so this notices shortly after the fact rather than as
         # it happens.
-        page = pages.Page(cfg.ssh_host)
-        threading.Thread(
-            target=pages.watch,
-            args=(page, self.turned.put, self.answering.is_set),
-            daemon=True,
-        ).start()
+        if not cfg.demo:
+            page = pages.Page(cfg.ssh_host)
+            threading.Thread(
+                target=pages.watch,
+                args=(page, self.turned.put, self.answering.is_set),
+                daemon=True,
+            ).start()
 
         while True:
             try:
@@ -799,7 +834,7 @@ class Session:
         tablet that will not answer costs the turn its context and nothing
         else: the turn goes on without a page to offer.
         """
-        if not self.cfg.allow_snap:
+        if not self.cfg.allow_snap or self.cfg.demo:
             return None
         began = time.monotonic()
         try:

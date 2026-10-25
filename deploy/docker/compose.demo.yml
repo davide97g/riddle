@@ -1,0 +1,32 @@
+# The demo server: RIDDLE_DEMO=1, no tablet, no ssh key anywhere in it. This is
+# the one App Review signs in to, and anybody else you want to show the app to
+# without lending them your notebook. On the author's homelab it is a Dokploy
+# compose app like apps/site, published on the Cloudflare tunnel as
+# riddle-demo.davideghiotto.it -> Traefik -> this container's 8765.
+#
+# The secrets come from Dokploy's environment tab, never from this file:
+#   RIDDLE_WEB_PASSWORD   the password handed to App Review in the review notes
+#   RIDDLE_OPENAI_KEY     the diary's replies; a key with a low spending cap
+services:
+  riddle-demo:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      RIDDLE_DEMO: "1"
+      RIDDLE_WEB_PASSWORD: ${RIDDLE_WEB_PASSWORD:?set it in Dokploy}
+      RIDDLE_OPENAI_KEY: ${RIDDLE_OPENAI_KEY:-}
+      # Nothing to read and nobody's room to keep: recordings go after a day.
+      RIDDLE_AUDIO_KEEP_DAYS: "1"
+      RM2_SSH_HOST: no-tablet.invalid
+    volumes:
+      - riddle-demo-data:/data
+    networks: [dokploy-network]
+
+volumes:
+  riddle-demo-data:
+
+networks:
+  dokploy-network:
+    external: true

@@ -305,6 +305,9 @@ class Server:
 
         from riddle.device import library
 
+        if config.get().demo:
+            return _json(writer, {"error": "this is a demo server: there is no tablet to put it on"},
+                         status="409 Conflict")
         if self.shelving:
             return _json(writer, {"error": "already putting something on the tablet"},
                          status="409 Conflict")
@@ -430,6 +433,9 @@ class Server:
         if guest:
             await sock.close(1008, "guests cannot watch the page")
             return
+        if config.get().demo:
+            await sock.close(1008, "this is a demo server: there is no tablet to watch")
+            return
         if not config.get().allow_snap:
             await sock.close(1008, "RIDDLE_ALLOW_SNAP is not set")
             return
@@ -463,7 +469,7 @@ class Server:
             "now_ms": self.store.now_ms(),
             "started_ms": self.store.started_ms,
             "listening": self.ears is not None,
-            "live": config.get().allow_snap,
+            "live": config.get().allow_snap and not config.get().demo,
             "vanish": self.store.vanish(),
             "watched": self.store.watcher(),
             "diary": self.diary(),

@@ -59,6 +59,18 @@ taken with the camera for it is never saved to the phone's library.
 removes everything.
 
 Two caveats about the pruning. `RIDDLE_AUDIO_KEEP_DAYS` is applied **at
+Before it connects to a server the app says, every time, that the server
+sends what is written and said to the AI model it is set up with, and the
+button is *Agree and Connect*: it cannot know what a server it has never met
+does, and connecting is the agreement. The app declares no collected data
+and no tracking in its privacy manifest, because it sends nothing anywhere
+but the server typed into it. The public form of all this, for the App
+Store, is `apps/site/privacy.html`.
+
+A **demo server** (`RIDDLE_DEMO=1`) keeps the same files as any other, under
+its own `var/`, and holds invented pages from `riddle demo seed`. It has no
+tablet and no ssh key, so none of the tablet rows above apply to it.
+
 startup only**, so a voice server left running for a month never prunes.
 And captures are not pruned at all.
 

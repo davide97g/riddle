@@ -62,6 +62,12 @@ SETTINGS: tuple[Setting, ...] = (
             "link` uses it, to probe both routes."),
     Setting("RIDDLE_AGENT", "agent", str, "/home/root/riddle/riddled", "device",
             "Where the agent lives on the tablet."),
+    Setting("RIDDLE_DEMO", "demo", bool, False, "device",
+            "No tablet at all. The loop answers in the timeline and draws "
+            "nowhere, nothing dials ssh, and the page can neither watch a "
+            "tablet nor put a file on one. For a server that shows the app to "
+            "somebody without lending them your notebook: App Review, a "
+            "friend deciding whether to buy a tablet."),
 
     # --- the diary ---
     Setting("RIDDLE_NOTEBOOK", "notebook", str, "Notebook", "diary",
@@ -187,6 +193,7 @@ class Config:
     ssh_host: str
     wifi_host: str
     agent: str
+    demo: bool
     notebook: str
     pause_ms: int
     openai_model: str

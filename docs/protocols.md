@@ -10,6 +10,12 @@ commands out of nine and none of the lines the agent had learned to send.
 plain lines over that pipe's stdout and stdin. It `select()`s on the pen
 node and on stdin together, so it can be drawing and reporting at once.
 
+Which nodes are the pen and the touchscreen it works out at startup, from
+what each one reports rather than from its number; see
+[tablets.md](tablets.md#how-the-agent-finds-the-pen). What it has to say
+about that goes to stderr, which is not part of this protocol: the host
+prints stderr and parses nothing on it.
+
 ### Out, on stdout
 
 | Line | Meaning |
@@ -140,11 +146,11 @@ Server to client:
 | `intent.ok {id, at_ms}` | a send was recorded, and this is its id |
 | `error {message}` | |
 
-`manager` is `systemd` where that half is a user unit and `here` where this
-process would start it itself — the page shows it because a stop asked of a
+`manager` is `systemd` where that half is a user unit, `launchd` where it is
+a launch agent on a Mac, and `here` where this process would start it itself — the page shows it because a stop asked of a
 supervisor is a different promise from a signal, and because a child spawned
 beside a running unit would be a second ssh pipe into one digitizer. Which of
-the two it is, is `riddle.process.manager`'s to decide; the server never
+the three it is, is `riddle.process.manager`'s to decide; the server never
 constructs a `Device` either way.
 
 Reconnecting is `hello {since: seq}` and nothing else. There is no other

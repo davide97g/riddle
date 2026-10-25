@@ -35,6 +35,22 @@ riddle voice   a page you speak into, served on loopback. Records,
 
 They share one sqlite file and no device. Either can run alone.
 
+## Your own
+
+For your own tablet and server, the one command is
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/davide97g/riddle/main/scripts/install.sh | bash
+```
+
+which clones this, makes the environment and runs `riddle setup` — a walk
+through the tablet's ssh key, the agent, the API key, the password, the
+microphone and starting at boot, one question at a time.
+[docs/self-hosting.md](docs/self-hosting.md) is the long form: Linux or a Mac
+as the server, Docker, reaching it from a phone, and what to do when it fails.
+The app for iPhone, iPad and Mac connects to that server; it is in
+[apps/apple](apps/apple/README.md).
+
 ## Quickstart
 
 You need `zig` (the cross-compiler), `ssh`/`scp`, the `claude` CLI, and
@@ -99,6 +115,9 @@ ones worth knowing:
 ./riddle clear --yes                           # eraser-sweep the page
 ./riddle snap --yes                            # photograph the tablet's screen
 ./riddle backup create|verify|restore          # snapshots of the tablet
+./riddle setup                                 # make this machine a server, step by step
+./riddle service install|uninstall             # both halves under systemd or launchd
+./riddle demo seed                             # invented pages, on a RIDDLE_DEMO server
 ```
 
 ## A warning about where the ink goes
@@ -152,6 +171,8 @@ apps/apple/            the same, native, for macOS and iOS
 apps/site/             the landing page, get-riddle.davideghiotto.it
 scripts/backup/        snapshot and restore, in shell
 docs/                  how it works, and why
+scripts/install.sh     the one-command install for a new server
+deploy/docker/         the server as a container, and the demo server
 var/                   everything written at runtime. gitignored, disposable
 ```
 
@@ -164,6 +185,9 @@ var/                   everything written at runtime. gitignored, disposable
 - [docs/protocols.md](docs/protocols.md) — both wires, in full
 - [docs/device.md](docs/device.md) — firmware, ssh over wifi, injection limits
 - [docs/configuration.md](docs/configuration.md) — every setting
+- [docs/tablets.md](docs/tablets.md) — which reMarkables, and what to redo on yours
+- [docs/self-hosting.md](docs/self-hosting.md) — your own server, from nothing
+- [docs/deploy.md](docs/deploy.md) — the author's own server, and why it is that shape
 - [docs/privacy.md](docs/privacy.md) — what is written down
 - [docs/backup.md](docs/backup.md) — snapshots of the tablet
 

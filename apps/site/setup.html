@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Set up riddle</title>
+  <meta name="description" content="Run your own riddle server for your reMarkable 2 and connect the iPhone, iPad or Mac app to it. Help and support.">
+  <link rel="canonical" href="https://get-riddle.davideghiotto.it/setup">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="stylesheet" href="/assets/doc.css">
+</head>
+<body>
+<main>
+  <a class="back" href="/">&larr; riddle</a>
+  <h1>Set up riddle</h1>
+  <p class="lede">riddle is three things you own: a reMarkable 2, a small server at home that talks to it, and the app on your iPhone, iPad or Mac. The app is the easy part. This page is the other two.</p>
+
+  <h2>What you need</h2>
+  <ul>
+    <li><strong>A reMarkable 2.</strong> The reMarkable 1 is experimental; the Paper Pro and Paper Pro Move are not supported. <a href="https://github.com/davide97g/riddle/blob/main/docs/tablets.md">Why</a>.</li>
+    <li><strong>A server</strong> that stays on, on the same network as the tablet: a mini PC, a Raspberry Pi 4 or 5, a NAS that runs Docker, or a Mac.</li>
+    <li><strong>An OpenAI API key</strong>, or a key for any compatible model that can read images. A reply costs a fraction of a cent.</li>
+  </ul>
+
+  <h2>1. Install the server</h2>
+  <p>On the server (Linux or macOS):</p>
+  <pre><code>curl -fsSL https://raw.githubusercontent.com/davide97g/riddle/main/scripts/install.sh | bash</code></pre>
+  <p>It downloads riddle and starts <code>riddle setup</code>, which asks one thing at a time: the tablet's address (USB is <code>10.11.99.1</code>; on wifi, see <em>Settings &gt; Help &gt; Copyrights and licenses</em>, where the root password is too), your API key, a password for the app, and whether to start riddle at boot. Nothing is drawn on the tablet during setup.</p>
+  <p>Prefer Docker? <code>docker compose -f deploy/docker/compose.yml up -d</code> from a clone: <a href="https://github.com/davide97g/riddle/blob/main/deploy/docker/README.md">the container guide</a>.</p>
+
+  <h2>2. Reach it from your phone</h2>
+  <div class="table"><table>
+    <tr><th>Way</th><th>Works from</th><th>Address for the app</th></tr>
+    <tr><td><strong>Tailscale</strong> (recommended)</td><td>your devices, anywhere</td><td>what <code>riddle voice share</code> prints</td></tr>
+    <tr><td>Home network</td><td>home wifi only</td><td><code>http://&lt;server address&gt;:8765</code></td></tr>
+    <tr><td>Your own domain, via a tunnel</td><td>anywhere</td><td><code>https://riddle.your-domain</code></td></tr>
+  </table></div>
+
+  <h2>3. Connect the app</h2>
+  <p>Open riddle, type the address and the password you chose during setup, and tap <strong>Agree and Connect</strong>. That is all the app ever needs.</p>
+
+  <h2>4. Write</h2>
+  <p>Open a notebook on the tablet. Write a question. Stop. Wait three seconds. Your ink fades, and the diary writes back in its own hand.</p>
+  <p>Before the first page, take a backup of the tablet: <code>riddle backup create</code>. The diary writes on whatever page is open.</p>
+
+  <h2>Help</h2>
+  <ul>
+    <li><code>riddle doctor</code> on the server checks everything and says what is wrong.</li>
+    <li>The full guide, with what to do when something fails: <a href="https://github.com/davide97g/riddle/blob/main/docs/self-hosting.md">docs/self-hosting.md</a>.</li>
+    <li>Questions and problems: <a href="https://github.com/davide97g/riddle/issues">open an issue on GitHub</a>.</li>
+    <li>What is kept and sent: <a href="/privacy">privacy</a>.</li>
+  </ul>
+
+  <footer>riddle is open source under the MIT licence. Not affiliated with reMarkable AS. reMarkable is a trademark of reMarkable AS.</footer>
+</main>
+</body>
+</html>

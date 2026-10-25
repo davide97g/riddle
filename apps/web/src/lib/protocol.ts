@@ -34,10 +34,10 @@ export type DiaryPresence = {
    *  from a server older than this field, which is read as yes */
   tablet?: boolean
   ago_ms: number | null
-  /** who runs that half on the server: a systemd user unit, or the server
-   *  itself with a pidfile. A stop under systemd is a request to a
-   *  supervisor, which is a weaker promise than a kill. */
-  manager: 'systemd' | 'here'
+  /** who runs that half on the server: a systemd user unit, a launchd
+   *  agent on a Mac, or the server itself with a pidfile. A stop under a
+   *  supervisor is a request to it, which is a weaker promise than a kill. */
+  manager: 'systemd' | 'launchd' | 'here'
   /** a start or stop asked from a page is still running */
   busy: boolean
 }

@@ -1,7 +1,8 @@
 # The tablet
 
 Everything specific to this reMarkable 2: what is on it, how to reach it,
-and the numbers that were measured rather than guessed.
+and the numbers that were measured rather than guessed. Other models, and
+what to redo on one, are in [tablets.md](tablets.md).
 
 ## Device state (verified 2026-09-21)
 
@@ -13,13 +14,23 @@ and the numbers that were measured rather than guessed.
 | xochitl | Qt 6.10.3 — so the Qt5 `rm2fb` shim still fails to load |
 | Python on device | **none** — `/usr/bin/python*` does not exist |
 | Pen node | `/dev/input/event1`, `Wacom I2C Digitizer` |
-| Touch node | `/dev/input/event2` |
+| Touch node | `/dev/input/event2`, `pt_mt` |
 | Digitizer range | X 0-20966, Y 0-15725, pressure 0-4095 |
 | `riddled` | runs on this firmware; `PING` -> `PONG` verified |
 
 Two of those rows are the reason this project is shaped the way it is. No
 Python on the device means the agent is C, static, musl. Qt6 xochitl against
 a Qt5 shim means no framebuffer, so everything is evdev.
+
+The two node rows are what the agent *finds* here, not what it assumes: it
+asks each `/dev/input/event*` what it reports and takes the pen and the
+touchscreen by that, falling back to these two paths only if nothing
+answers. An rM1 numbers the same devices differently;
+[tablets.md](tablets.md#how-the-agent-finds-the-pen) has the rule.
+
+3.28 is also the firmware every number on this page was measured on, and
+`riddle doctor` reports the tablet's firmware against it (`CALIBRATED_ON` in
+`riddle/doctor.py` mirrors this table).
 
 The 3.28 update **wiped the document store**: `/home/root/.local/share/
 remarkable/xochitl` held no `.metadata` files afterwards, so a notebook

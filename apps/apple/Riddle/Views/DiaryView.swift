@@ -218,7 +218,7 @@ struct DiaryButton: View {
             Button("Leave it running", role: .cancel) {}
         } message: {
             Text("The half that owns the pen goes down: the link to the tablet closes, anything it was drawing stops where it is, and nothing will answer a send until it is started again. "
-                 + (presence.manager == "systemd"
+                 + (presence.manager != "here"
                     ? "It is a service here, so it stays down until it is asked back."
                     : "It is started again from here, or with riddle diary start.")
                  + " What is written stays written.")

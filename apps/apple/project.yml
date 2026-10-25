@@ -14,7 +14,7 @@ settings:
     # things that say otherwise are the audio tap and the wire types.
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     DEAD_CODE_STRIPPING: YES
@@ -38,13 +38,18 @@ targets:
         CFBundleDisplayName: riddle
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # HTTPS and an HMAC for the password's cookie, nothing else: exempt,
+        # and saying so here saves the question on every upload.
+        ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.productivity
         NSMicrophoneUsageDescription: What you say to the diary is streamed to your riddle server to be transcribed.
         NSCameraUsageDescription: A photo you take is put on the tablet as a page in its library, and is not kept on the phone.
         NSLocalNetworkUsageDescription: The riddle server usually lives on your own network.
         # The server is plain http on the LAN or the tailnet, and https only
         # behind the tunnel. Its address is typed in by hand, so there is no
-        # list of domains to except.
+        # list of domains to except. Not NSAllowsLocalNetworking: its presence
+        # makes iOS ignore this key, and a tailnet's MagicDNS name over http
+        # is neither local nor an IP. The review notes say why.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UILaunchScreen: {}
