@@ -1,3 +1,5 @@
+import ImageIO
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -31,11 +33,51 @@ enum Library {
         }
         let data = try Data(contentsOf: url)
         let type = UTType(filenameExtension: url.pathExtension) ?? .data
+        return try chosen(data, type: type, fileName: url.lastPathComponent)
+    }
+
+    /// The one way in, for a file, a photo from the library or the camera.
+    static func chosen(_ data: Data, type: UTType, fileName: String) throws -> Chosen {
         guard types.contains(where: type.conforms) else {
             throw ServerError.said("It takes a pdf, an epub or an image.")
         }
-        let name = url.deletingPathExtension().lastPathComponent.trimmingCharacters(in: .whitespaces)
-        return Chosen(data: data, type: type, fileName: url.lastPathComponent, name: name.isEmpty ? "Untitled" : name)
+        var (data, type, fileName) = (data, type, fileName)
+        if type.conforms(to: .image), !pillowReads.contains(where: type.conforms) {
+            guard let jpeg = jpeg(data) else {
+                throw ServerError.said("That picture could not be turned into a jpeg.")
+            }
+            data = jpeg
+            type = .jpeg
+            fileName = (fileName as NSString).deletingPathExtension + ".jpg"
+        }
+        if data.count > maxBytes {
+            throw ServerError.said("The tablet takes up to 64 MB; this is \(size(data.count)).")
+        }
+        let name = (fileName as NSString).deletingPathExtension.trimmingCharacters(in: .whitespaces)
+        return Chosen(data: data, type: type, fileName: fileName, name: name.isEmpty ? "Untitled" : name)
+    }
+
+    /// What the server's Pillow opens without plugins. A phone's own format,
+    /// HEIC, is not among them, so anything else is made a jpeg here.
+    private static let pillowReads: [UTType] = [.png, .jpeg, .gif, .webP, .bmp, .tiff]
+
+    /// Re-encoded with its metadata, the rotation flag included: the server
+    /// turns the picture the way the camera meant it.
+    private static func jpeg(_ data: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        let options = [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary
+        CGImageDestinationAddImageFromSource(dest, source, 0, options)
+        return CGImageDestinationFinalize(dest) ? out as Data : nil
+    }
+
+    /// A photo has no file name of its own here, so it is named for when it
+    /// was chosen.
+    static func photoName() -> String {
+        "Photo " + Date.now.formatted(.dateTime.day().month(.abbreviated).hour().minute())
     }
 }
 
@@ -43,27 +85,118 @@ enum Library {
 /// pen can only trace a picture, and xochitl renders a pdf itself far
 /// better than a tracing of it. It asks first, every time, because the way
 /// in is a restart of xochitl.
+///
+/// Three ways to choose it: a file, a photo from the library, or, on the
+/// iPhone, the camera. Whatever is chosen is held in memory only; a photo
+/// taken here is never saved to the library.
 struct SendToTabletButton: View {
     @State private var picking = false
+    @State private var browsing = false
+    @State private var photo: PhotosPickerItem?
+    @State private var shooting = false
+    @State private var shot: Data?
     @Environment(Toasts.self) private var toasts
     @Environment(Outbox.self) private var outbox
 
     var body: some View {
-        Button { picking = true } label: { Image(systemName: "doc.badge.arrow.up") }
-            .help("Put a pdf, an epub or an image on the tablet")
-            .accessibilityLabel("Put a document on the tablet")
-            .fileImporter(isPresented: $picking, allowedContentTypes: Library.types) { result in
-                switch result {
-                case let .success(url):
-                    do { outbox.chosen = try Library.read(url) } catch {
-                        toasts.failure("That file will not go", error.localizedDescription)
-                    }
-                case let .failure(error):
-                    toasts.failure("Could not open it", error.localizedDescription)
-                }
+        Menu {
+            Button { browsing = true } label: { Label("Photo library", systemImage: "photo.on.rectangle") }
+            #if os(iOS)
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button { shooting = true } label: { Label("Take a photo", systemImage: "camera") }
             }
+            #endif
+            Button { picking = true } label: { Label("Files", systemImage: "folder") }
+        } label: {
+            Image(systemName: "doc.badge.arrow.up")
+        }
+        .help("Put a pdf, an epub or an image on the tablet")
+        .accessibilityLabel("Put a document on the tablet")
+        .fileImporter(isPresented: $picking, allowedContentTypes: Library.types) { result in
+            switch result {
+            case let .success(url):
+                do { outbox.chosen = try Library.read(url) } catch {
+                    toasts.failure("That file will not go", error.localizedDescription)
+                }
+            case let .failure(error):
+                toasts.failure("Could not open it", error.localizedDescription)
+            }
+        }
+        .photosPicker(isPresented: $browsing, selection: $photo, matching: .images, preferredItemEncoding: .current)
+        .onChange(of: photo) { _, item in
+            guard let item else { return }
+            photo = nil
+            Task { await take(item) }
+        }
+        #if os(iOS)
+        // The confirmation is a sheet of its own, which cannot open until
+        // the camera has gone, so the photo waits for the dismissal.
+        .fullScreenCover(isPresented: $shooting) {
+            if let data = shot { shot = nil; choose(data, type: .jpeg) }
+        } content: {
+            Camera { shot = $0?.jpegData(compressionQuality: 0.9) }
+                .ignoresSafeArea()
+        }
+        #endif
+    }
+
+    /// The photo as it is stored, a HEIC from an iPhone's camera, which
+    /// `Library.chosen` turns into a jpeg.
+    private func take(_ item: PhotosPickerItem) async {
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                toasts.failure("Could not open it", "The photo came back empty.")
+                return
+            }
+            let type = item.supportedContentTypes.first { $0.conforms(to: .image) } ?? .jpeg
+            choose(data, type: type)
+        } catch {
+            toasts.failure("Could not open it", error.localizedDescription)
+        }
+    }
+
+    private func choose(_ data: Data, type: UTType) {
+        let fileName = Library.photoName() + "." + (type.preferredFilenameExtension ?? "jpg")
+        do { outbox.chosen = try Library.chosen(data, type: type, fileName: fileName) } catch {
+            toasts.failure("That photo will not go", error.localizedDescription)
+        }
     }
 }
+
+#if os(iOS)
+/// The system camera. SwiftUI has no camera of its own, so this is
+/// UIKit's picker, which hands back the picture and is dismissed.
+private struct Camera: UIViewControllerRepresentable {
+    let took: (UIImage?) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_: UIImagePickerController, context _: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let camera: Camera
+        init(_ camera: Camera) { self.camera = camera }
+
+        func imagePickerController(_: UIImagePickerController,
+                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            camera.took(info[.originalImage] as? UIImage)
+            camera.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_: UIImagePickerController) {
+            camera.dismiss()
+        }
+    }
+}
+#endif
 
 /// The one file waiting to go, shared by the button, the drop target and
 /// both pages.

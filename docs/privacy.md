@@ -53,8 +53,10 @@ in its own sandbox rather than a browser:
   each one that was understood. Deleted from the shelf, the file goes too.
 
 Captures shown in the timeline are fetched with the cookie and held in
-memory only. "Forget this server" removes the address and the token;
-deleting the app removes everything.
+memory only. So is a file or photo chosen to put on the tablet: a photo
+taken with the camera for it is never saved to the phone's library.
+"Forget this server" removes the address and the token; deleting the app
+removes everything.
 
 Two caveats about the pruning. `RIDDLE_AUDIO_KEEP_DAYS` is applied **at
 startup only**, so a voice server left running for a month never prunes.

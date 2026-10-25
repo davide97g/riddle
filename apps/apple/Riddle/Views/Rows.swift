@@ -230,6 +230,7 @@ struct CaptureImage: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(alt)
+                .overlay(alignment: .topTrailing) { CopyImageButton(image: image) }
                 .sheet(isPresented: $zoomed) {
                     ZoomedImage(image: image, title: alt, look: .ink)
                 }
@@ -265,11 +266,34 @@ enum CaptureCache {
     }()
 }
 
+/// The picture as it came, onto the clipboard: the paper the look drops
+/// from the preview is still in it.
+struct CopyImageButton: View {
+    let image: PlatformImage
+    @Environment(Toasts.self) private var toasts
+
+    var body: some View {
+        Button {
+            Clipboard.image(image)
+            toasts.success("Copied to the clipboard")
+        } label: {
+            Image(systemName: "doc.on.doc").font(.caption)
+                .padding(6)
+                .background(.regularMaterial, in: .circle)
+        }
+        .buttonStyle(.plain)
+        .padding(4)
+        .help("Copy this page")
+        .accessibilityLabel("Copy this page")
+    }
+}
+
 /// A picture opened full size, with nothing else in the way.
 struct ZoomedImage: View {
     let image: PlatformImage
     let title: String
     let look: Look
+    @Environment(Toasts.self) private var toasts
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -285,6 +309,12 @@ struct ZoomedImage: View {
                 #endif
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            Clipboard.image(image)
+                            toasts.success("Copied to the clipboard")
+                        } label: { Label("Copy", systemImage: "doc.on.doc") }
+                    }
                 }
         }
         #if os(macOS)

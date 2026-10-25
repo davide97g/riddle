@@ -219,10 +219,11 @@ private struct Thumb: View {
     let look: Look
     let tap: () -> Void
     @Environment(Snapshots.self) private var snapshots
+    @Environment(Toasts.self) private var toasts
 
     var body: some View {
-        Button(action: tap) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
+            Button(action: tap) {
                 Group {
                     if let data = snapshots.png(snap), let image = PlatformImage(data: data) {
                         Image(platform: image).resizable().scaledToFit().look(look)
@@ -242,11 +243,24 @@ private struct Thumb: View {
                             .background(.regularMaterial, in: .circle).padding(3)
                     }
                 }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open the snapshot from \(snap.at.formatted())")
+            HStack(spacing: 4) {
                 Text(snap.at.clock).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button(action: copy) { Image(systemName: "doc.on.doc").font(.caption2) }
+                    .buttonStyle(.borderless)
+                    .help("Copy this snapshot")
+                    .accessibilityLabel("Copy the snapshot from \(snap.at.formatted())")
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open the snapshot from \(snap.at.formatted())")
+    }
+
+    private func copy() {
+        guard let data = snapshots.png(snap) else { return }
+        Clipboard.png(data)
+        toasts.success("Copied to the clipboard")
     }
 }
 

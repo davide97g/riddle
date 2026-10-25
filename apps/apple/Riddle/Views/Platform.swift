@@ -28,6 +28,16 @@ enum Clipboard {
         #endif
     }
 
+    static func image(_ image: PlatformImage) {
+        #if os(macOS)
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.writeObjects([image])
+        #else
+        UIPasteboard.general.image = image
+        #endif
+    }
+
     static func text(_ text: String) {
         #if os(macOS)
         let board = NSPasteboard.general
