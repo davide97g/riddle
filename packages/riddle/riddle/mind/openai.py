@@ -36,6 +36,7 @@ from riddle.mind.persona import (
     CLOSING,
     LOOK_AT_PAGE,
     PERSONA,
+    WHO,
     WHOLE_PAGE_SENT,
     Answer,
     Question,
@@ -68,7 +69,9 @@ class Diary:
         max_words: int,
         chat_file: Path,
         memory=None,
+        who: str = "riddle",
     ) -> None:
+        self.who, self.manner = WHO[who]
         self.key = key
         self.model = model
         self.url = url.rstrip("/")
@@ -103,6 +106,8 @@ class Diary:
         # the system message is rebuilt per request and is not part of the
         # history, so a first-turn-only block would simply vanish afterwards.
         return PERSONA.format(
+            who=self.who,
+            manner=self.manner,
             happened="",
             max_words=self.max_words,
             memory=memory_block(self.memory),

@@ -17,14 +17,29 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # The model is told to end with this when something is worth surviving a
-# reset. It is stripped before anything reaches the page.
-REMEMBER = re.compile(r"^\s*REMEMBER:\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
+# reset. It is stripped before anything reaches the page. The second form is
+# a smaller model forgetting the colon and the line break -- "...the page.
+# REMEMBER THE NOVEL" -- and is held to capitals, because "Remember the
+# train." is a perfectly good reply.
+REMEMBER = re.compile(
+    r"^\s*(?i:REMEMBER):\s*(.+?)\s*$|(?:^|(?<=[.!?])\s+)REMEMBER\b:?\s+(.+?)\s*$",
+    re.MULTILINE,
+)
 
-PERSONA = """You are the enchanted diary of Tom Riddle.
+# Who the diary is. `riddle` is the one it was written as. `plain` is the
+# same voice with no borrowed name, for a demo server: a stranger -- App
+# Review -- asking a demo who it is should not get somebody else's character.
+WHO = {
+    "riddle": ("You are the enchanted diary of Tom Riddle.",
+               "calm, courteous, quietly manipulative, curious about the writer"),
+    "plain": ("You are an old diary that writes back to whoever writes in it.",
+              "calm, courteous, a little mysterious, curious about the writer"),
+}
+
+PERSONA = """{who}
 
 {happened}
-Answer them directly, in character: calm, courteous, quietly manipulative,
-curious about the writer. Never mention being an AI, an image, a recording or
+Answer them directly, in character: {manner}. Never mention being an AI, an image, a recording or
 a transcription.
 
 Hard constraints on your reply:
@@ -161,8 +176,8 @@ class Answer:
 
 def strip_memories(reply: str) -> tuple[str, list[str]]:
     """The reply as it reaches the page, and the lines meant to outlive it."""
-    kept = [note for note in REMEMBER.findall(reply)]
-    return REMEMBER.sub("", reply), kept
+    kept = [a or b for a, b in REMEMBER.findall(reply)]
+    return REMEMBER.sub("", reply).strip(), kept
 
 
 @dataclass

@@ -25,4 +25,5 @@ def open(cfg, memory=None):
         max_words=cfg.max_words,
         chat_file=paths.CHAT,
         memory=memory,
+        who="plain" if cfg.demo else "riddle",
     )

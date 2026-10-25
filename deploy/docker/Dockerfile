@@ -38,7 +38,7 @@ RUN bun run build
 # --- the server ---------------------------------------------------------------
 FROM python:3.13-slim-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      openssh-client tini curl ca-certificates libgomp1 && rm -rf /var/lib/apt/lists/*
+      openssh-client tini curl ca-certificates libgomp1 procps && rm -rf /var/lib/apt/lists/*
 COPY --from=ears /usr/local/bin/parakeet-cli /usr/local/bin/parakeet-cli
 
 WORKDIR /app

@@ -22,7 +22,7 @@ nothing reads, a value of the wrong type, and a stale example file.
 | `RM2_SSH_HOST` | `rm2` | the loop, the tools | The ssh alias the diary talks to. Define it in ~/.ssh/config, ideally with a key, so no password is ever needed. |
 | `RM2_WIFI_HOST` | `unset` | the loop, the tools | The tablet's address over wifi, if it has one. Only `riddle link` uses it, to probe both routes. |
 | `RIDDLE_AGENT` | `/home/root/riddle/riddled` | the loop, the tools | Where the agent lives on the tablet. |
-| `RIDDLE_DEMO` | off | the loop, the page | No tablet at all. The loop answers in the timeline and draws nowhere, nothing dials ssh, and the page refuses Live and putting a file on a tablet. For a server that shows the app to somebody without lending them your notebook -- App Review signs in to one ([self-hosting.md](self-hosting.md#a-demo-server)). `riddle demo seed` writes a few invented pages into it, and refuses anywhere else. |
+| `RIDDLE_DEMO` | off | the loop, the page | No tablet at all. The loop answers in the timeline and draws nowhere, nothing dials ssh, and the page refuses Live and putting a file on a tablet. The diary answers as a plain old diary rather than as Tom Riddle, so a stranger asking it who it is gets nobody else's character. For a server that shows the app to somebody without lending them your notebook -- App Review signs in to one ([self-hosting.md](self-hosting.md#a-demo-server)). `riddle demo seed` writes a few invented pages into it, and refuses anywhere else. |
 
 ## the diary
 
